@@ -19,11 +19,11 @@ from django.urls import path, include
 
 api_v1_patterns = [
     #Apps
-    path('auth/', include('apps.authentication.urls')),
-    path('listings/', include('apps.listings.urls')),
-    path('notifications/', include('apps.notifications.urls')),
-    path('payments/', include('apps.payments.urls')),
-    path('users/', include('apps.users.urls')),
+    path('auth/', include('authentication.urls')),
+    path('listings/', include('listings.urls')),
+    path('notifications/', include('notifications.urls')),
+    path('payments/', include('payments.urls')),
+    path('users/', include('users.urls')),
     #Admin
     path('admin/', admin.site.urls),
 ]
