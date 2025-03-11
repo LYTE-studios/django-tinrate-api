@@ -59,13 +59,41 @@ class RegisterSerializer(serializers.ModelSerializer):
         return data
     
     def validate_username(self, value):
-        """"""
+        """
+        Validate the username field.
+
+        This method checks if the given username is already taken. If the username 
+        exists in the database, it raises a validation error.
+
+        Args:
+            value (str): The username provided by the user.
+
+        Returns:
+            str: The validated username if it does not already exist.
+
+        Raises:
+            serializers.ValidationError: If the username is already taken.
+        """
         if User.objects.filter(username=value).exists():
             raise serializers.ValidationError("This username is already taken.")
         return value
     
     def validate_email(self, value):
-        """"""
+        """
+        Validate the email field.
+
+        This method checks if the provided email address is already registered. 
+        If the email exists in the database, it raises a validation error.
+
+        Args:
+            value (str): The email address provided by the user.
+
+        Returns:
+            str: The validated email address if it does not already exist.
+
+        Raises:
+            serializers.ValidationError: If the email is already registered.
+        """
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("This email is already registered.")
         return value
