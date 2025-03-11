@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from authentication.serializers.auth_serializers import RegisterSerializer
+from authentication.serializers.auth_serializers import RegisterSerializer, LoginSerializer
 from authentication.services.tokens_services import TokenService
 
 class RegisterView(APIView):
@@ -50,4 +50,47 @@ class RegisterView(APIView):
             status=status.HTTP_201_CREATED,)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+class LoginView(APIView):
+    """
+    View for user login and JWT token generation.
 
+    This view handles user authentication by accepting a username and password,
+    validating them using the `LoginSerializer`, and generating JWT authentication
+    tokens (access & refresh) upon successful login.
+
+    Methods:
+        post(self, request, *args, **kwargs):
+            Handles POST requests for user login and returns authentication tokens.
+    """
+    def post(self, request, *args, **kwargs):
+        """
+        Handles POST requests for user login.
+
+        This method:
+            - Validates the input credentials using `LoginSerializer`.
+            - If valid, generates authentication tokens.
+            - Returns the tokens in the response.
+
+        Args:
+            request (Request): The HTTP request object containing login credentials.
+
+        Returns:
+            Response: A response containing access and refresh tokens if successful,
+                      or an error message if authentication fails.
+        """
+        serializer = LoginSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.validated_data["user"]
+ 
+            token = TokenService.generate_jwt_token(user)
+
+            return Response(
+                {
+                    "user": user.id,
+                    "message": "Login successful!",
+                    "access": token["access"],  # Access token
+                    "refresh": token["refresh"],  # Refresh token
+                },
+                status=status.HTTP_200_OK
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
