@@ -31,6 +31,7 @@ class Payment(models.Model):
             ("canceled", "Canceled"), #payment released, no charge
             ("refunded", "Refunded"), #after charge, full refund
             ("partially_refunded", " Partially Refunded"), #after charge, partial refund
+            ("failed", " Failed"), #payment attempt failed
         ],
         default="authorized"
     )
