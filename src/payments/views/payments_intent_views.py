@@ -33,12 +33,12 @@ class CreatePaymentIntentView(APIView):
             - JSON response containing PaymentIntent details.
         """
 
-        serializer = PaymentSerializer(data=request.data)
+        serializer = PaymentSerializer(data=request.data, context={"request": request})
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         amount = serializer.validated_data["amount"]
-        expert_id = serializer.validated_data["amount"] #user acting as expert
+        expert_id = serializer.validated_data["expert_id"] #user acting as expert
 
         if not amount or not expert_id:
             return Response({"error": "Amount and expert_id are required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -73,7 +73,7 @@ class CreatePaymentIntentView(APIView):
         try:
             #store the payment in the database
             Payment.objects.create(
-                user=request.user,
+                customer=request.user,
                 expert=expert,
                 stripe_payment_intent_id=intent.id,
                 amount=amount,

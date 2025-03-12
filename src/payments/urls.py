@@ -8,11 +8,11 @@ from .views.payments_fail_views import FailPaymentsView
 from .webhooks.views.stripe_webhook_views import StripeWebhookView
 
 urlpatterns = [
-    path('intent/', CreatePaymentIntentView.as_view(), name='capture_payment'),
+    path('intent/', CreatePaymentIntentView.as_view(), name='intent_payment'),
     path('capture/', CapturePaymentView.as_view(), name='capture_payment'),
     path('release/', ReleasePaymentView.as_view(), name='release_payment'),
     path('refund/', RefundPaymentView.as_view(), name='refund_payment'),
-    path('cancel/', ChargeCancellationFeeView.as_view(), name='capture_payment'),
+    path('cancel/', ChargeCancellationFeeView.as_view(), name='cancel_payment'),
     path('fail/', FailPaymentsView.as_view(), name='fail_payment'),
 
     path('webhook/', StripeWebhookView.as_view(), name='stripe_webhook')
