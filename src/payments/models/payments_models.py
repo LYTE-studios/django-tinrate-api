@@ -42,4 +42,4 @@ class Payment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.customer} → {self.expert} | {self.amount} | {self.status}"
+        return f"{self.customer} → {self.expert} | {self.amount:.2f} | {self.status}"
