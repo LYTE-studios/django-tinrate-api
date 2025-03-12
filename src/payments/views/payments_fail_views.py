@@ -2,8 +2,8 @@ from rest_framework import generics, permissions, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.core.exceptions import ObjectDoesNotExist
-from models.payments_models import Payment
-from serializers.payments_fail_serializers import FailedPaymentSerializer
+from payments.models.payments_models import Payment
+from payments.serializers.payments_fail_serializers import FailedPaymentSerializer
 
 class FailPaymentsView(generics.ListAPIView):
     """

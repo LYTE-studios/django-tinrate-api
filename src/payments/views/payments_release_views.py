@@ -3,11 +3,11 @@ from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from models.payments_models import Payment
+from payments.models.payments_models import Payment
 from users.models.user_models import User
 from rest_framework import status
-from views.payments_cancel_views import ChargeCancellationFeeView
-from serializers.payments_release_serializers import ReleasePaymentSerializer
+from .payments_cancel_views import ChargeCancellationFeeView
+from payments.serializers.payments_release_serializers import ReleasePaymentSerializer
 
 
 class ReleasePaymentView(APIView):

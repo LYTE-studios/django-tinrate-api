@@ -4,11 +4,15 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+djangorestframework-simplejwt = "*"
+django-environ = "*"
+stripe = "*"
 django = "*"
 djangorestframework = "*"
-djangorestframework-simplejwt = "*"
-stripe = "*"
-django-environ = "*"
+pytest = "*"
+celery = "*"
+redis = "*"
+kombu = "*"
 
 [dev-packages]
 

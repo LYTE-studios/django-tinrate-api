@@ -3,10 +3,10 @@ from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from models.payments_models import Payment
+from payments.models.payments_models import Payment
 from users.models.user_models import User
 from rest_framework import status
-from serializers.payments_intent_serializers import PaymentSerializer
+from payments.serializers.payments_intent_serializers import PaymentSerializer
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 

@@ -3,7 +3,7 @@ from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from models.payments_models import Payment
+from payments.models.payments_models import Payment
 from payments.serializers.payments_refund_serializers import RefundPaymentSerializer
 from users.models.user_models import User
 from rest_framework import status
