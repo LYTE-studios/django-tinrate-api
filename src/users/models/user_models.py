@@ -11,6 +11,7 @@ class User(AbstractUser):
 
     is_customer = models.BooleanField(default=True)
     is_expert = models.BooleanField(default=False)
+    allow_cancellation_fee = models.BooleanField(default=False)
 
     def __str__(self):
         return self.username
