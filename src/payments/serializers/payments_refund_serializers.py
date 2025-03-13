@@ -1,4 +1,6 @@
-from rest_framework import serializers
+from requests import Response
+from rest_framework import serializers, status
+from rest_framework.exceptions import NotFound
 from payments.models.payments_models import Payment
 
 class RefundPaymentSerializer(serializers.Serializer):
@@ -14,7 +16,7 @@ class RefundPaymentSerializer(serializers.Serializer):
         amount (Decimal): The amount to refund, which can be partial or full.
     """
     payment_intent_id = serializers.CharField()
-    amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    refund_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
 
     def validate(self, data):
         """
@@ -29,8 +31,10 @@ class RefundPaymentSerializer(serializers.Serializer):
         Raises:
             ValidationError: If the refund amount is less than or equal to zero.
         """
-        if data["amount"] <= 0:
-            raise serializers.ValidationError("Refund amount must be greater than 0.")
+        refund_amount = data.get("refund_amount")
+        print(f"Received refund_amount: {refund_amount}")
+        if refund_amount is not None and refund_amount <= 0:
+            raise serializers.ValidationError({"non_field_errors": ["Refund amount must be greater than 0."]})
         return data
     
     def validate_payment_intent_id(self, value):
@@ -51,7 +55,7 @@ class RefundPaymentSerializer(serializers.Serializer):
         try:
             payment = Payment.objects.get(stripe_payment_intent_id=value)
         except Payment.DoesNotExist:
-            raise serializers.ValidationError("Payment not found.")
+            raise NotFound("Payment not found.")
         
         
         if payment.status == "refunded":

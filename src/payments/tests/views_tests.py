@@ -342,3 +342,75 @@ class FailPaymentsViewTest(APITestCase):
         with self.assertRaises(Exception):
             with self.client.force_authenticate(user=self.user):
                 self.client.get(self.url)
+
+class RefundPaymentViewTest(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.customer = User.objects.create_user(username="customer", password="password123")
+        self.expert = User.objects.create_user(username="expert", password="password123", is_expert=True, 
+                                               allow_cancellation_fee=True)
+        self.client.force_authenticate(user=self.customer)
+
+        self.payment = Payment.objects.create(
+            customer=self.customer,
+            expert=self.expert,
+            stripe_payment_intent_id="pi_123",
+            amount=100.00,
+            status="authorized",
+        )
+        self.url = reverse("refund_payment")
+    
+    def test_missing_payment_intent_id(self):
+        """Test refund request with mising payment_intent_id."""
+        response = self.client.post(self.url, {})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("payment_intent_id", response.data)
+        self.assertEqual(response.data["payment_intent_id"], ["This field is required."])
+
+    def test_payment_not_found(self):
+        """Test refund request when payment does not exist."""
+        response = self.client.post(self.url, {"payment_intent_id":"nonexistent_id"})
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn("Payment not found.", response.json()["detail"])
+
+    def test_payment_already_refunded(self):
+        """Test refund request when payment has already been refunded."""
+        self.payment.status = "refunded"
+        self.payment.save()
+        response = self.client.post(self.url, {"payment_intent_id": self.payment.stripe_payment_intent_id})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Payment has already been refunded.", str(response.data["payment_intent_id"]))
+
+    @patch("stripe.Refund.create")
+    def test_invalid_refund_amount(self, mock_refund_create):
+        """Test refund request with invalid refund amount."""
+        mock_refund_create.return_value = {"id": "refund_123", "status":"failed"}
+        response = self.client.post(self.url, {
+            "payment_intent_id":self.payment.stripe_payment_intent_id,
+            "refund_amount":-10.00,
+        })
+        print(response.content)
+        print(response.data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Refund amount must be greater than 0.", response.json()["non_field_errors"])
+        mock_refund_create.assert_not_called()
+
+    @patch("stripe.Refund.create")
+    def test_successful_full_refund(self, mock_refund_create):
+        """Test a successful full refund."""
+        mock_refund_create.return_value = {"id": "refund_123", "status":"captured"}
+        response = self.client.post(self.url, {"payment_intent_id": self.payment.stripe_payment_intent_id})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("Refund processed successfully.", response.json()["message"])
+        self.assertEqual(response.json()["refund_id"], "refund_123")
+
+    @patch("stripe.Refund.create")
+    def test_successful_partial_refund(self, mock_refund_create):
+        """Test a successful partial refund."""
+        mock_refund_create.return_value = {"id": "refund_123", "status": "succeeded"}
+        response = self.client.post(self.url, {"payment_intent_id": self.payment.stripe_payment_intent_id, "refund_amount": 50.0})
+        self.payment.refresh_from_db()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("Refund processed successfully.", response.json()["message"])
+        self.assertEqual(response.json()["refund_id"], "refund_123")
+        self.assertEqual(self.payment.status, "partially_refunded")

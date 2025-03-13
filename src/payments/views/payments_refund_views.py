@@ -2,6 +2,7 @@ import stripe
 from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.exceptions import NotFound
 from rest_framework.permissions import IsAuthenticated
 from payments.models.payments_models import Payment
 from payments.serializers.payments_refund_serializers import RefundPaymentSerializer
@@ -40,10 +41,13 @@ class RefundPaymentView(APIView):
             Response: A response containing a success message with the refund ID or an error message if the refund fails.
         """
         serializer = RefundPaymentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         
-        if serializer.is_valid():
-            payment_intent_id = serializer.validated_data["payment_intent_id"]
-            refund_amount = serializer.validated_data("refund_amount")
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                
+        payment_intent_id = serializer.validated_data["payment_intent_id"]
+        refund_amount = serializer.validated_data.get("refund_amount")
 
         #ensure payment_intent_id is provided
         if not payment_intent_id:
@@ -53,24 +57,25 @@ class RefundPaymentView(APIView):
         try:
             payment = Payment.objects.get(stripe_payment_intent_id = payment_intent_id)
         except Payment.DoesNotExist:
-            return Response({"error": "Payment not found."}, status=status.HTTP_404_NOT_FOUND)
+            raise NotFound({"error": "Payment not found."})
         
         #process refund 
         try:
-            if refund_amount:
+            if refund_amount is not None:
                 #if refund_amount is provided, process a partial refund
                 refund = stripe.Refund.create(
                     payment_intent=payment_intent_id,
                     amount=int(refund_amount * 100)
                 )
                 payment.status = "partially_refunded"
+                payment.save()
             else:
                 #if not refund_amount is provided, process a full refund
                 refund = stripe.Refund.create(payment_intent=payment_intent_id)
                 payment.status = "refunded"
+                payment.save()
 
-            payment.save()
-            return Response({"message": "Refund processed successfully.", "refund_id": refund.id})
+            return Response({"message": "Refund processed successfully.", "refund_id": refund["id"]})
         
         except stripe.error.CardError as e:
             return Response({"error": "Card error:" + str(e)}, status=status.HTTP_400_BAD_REQUEST)
