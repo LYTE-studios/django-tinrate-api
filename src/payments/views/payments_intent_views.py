@@ -72,14 +72,18 @@ class CreatePaymentIntentView(APIView):
 
         try:
             #store the payment in the database
+            intent_id = intent.get("id") if isinstance(intent, dict) else intent.id
+            client_secret = intent.get("client_secret") if isinstance(intent, dict) else intent.client_secret
             Payment.objects.create(
                 customer=request.user,
                 expert=expert,
-                stripe_payment_intent_id=intent.id,
+                stripe_payment_intent_id=intent_id,
                 amount=amount,
                 status="authorized"
             )
+            print("Intent response:", intent)
+
         except Exception as e:
             return Response({"error": "Error saving payment information" + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        return Response({"payment_intent": intent.id, "client_secret": intent.client_secret})
+        return Response({"payment_intent": intent_id, "client_secret": client_secret})

@@ -38,19 +38,19 @@ class ChargeCancellationFeeView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         payment_intent_id = serializer.validated_data['payment_intent_id']
-        percentage = serializer.validated_data['percentage']
+        percentage = serializer.validated_data.get('percentage') 
 
         if not payment_intent_id:
             return Response({"error": "Payment Intent ID is required."}, status=status.HTTP_400_BAD_REQUEST)
         
         payment = Payment.objects.get(stripe_payment_intent_id = payment_intent_id)
         
-        #check if the expert has set a cancellation fee
-        if percentage is None:
-            expert = payment.expert
-            if expert.is_expert and expert.allow_cancellation_fee is False:
+        #check if the expert has set a cancellation fee 
+        expert = payment.expert
+        if expert.is_expert and not expert.allow_cancellation_fee:
                 return Response({"message": "Expert does not charge cancellation fee."}, status=status.HTTP_200_OK)
             
+        if expert.allow_cancellation_fee and percentage is None:
             return Response({"error": "Cancellation percentage is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         amount_to_charge = float(payment.amount) * (float(percentage) / 100)
@@ -60,7 +60,7 @@ class ChargeCancellationFeeView(APIView):
             payment.status = "partially_captured"
             payment.cancellation_fee = percentage
             payment.save()
-            return Response({"message": f"Catptured {percentage}% cancellation fee."})
+            return Response({"message": f"Captured {percentage:.0f}% cancellation fee."})
         
         except stripe.error.CardError as e:
             return Response({"error": "Card error:" + str(e)}, status=status.HTTP_400_BAD_REQUEST)

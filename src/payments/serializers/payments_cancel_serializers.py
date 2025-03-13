@@ -10,8 +10,10 @@ class CancelPaymentSerializer(serializers.Serializer):
 
     Attributes:
         payment_intent_id (str): The Stripe PaymentIntent ID associated with the payment to be canceled.
+        percentage(int): The percentage set by the expert for cancellation fee.
     """
     payment_intent_id = serializers.CharField()
+    percentage = serializers.FloatField(required=False)
 
     def validate_payment_intent_id(self, value):
         """
