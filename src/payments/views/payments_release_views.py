@@ -37,17 +37,16 @@ class ReleasePaymentView(APIView):
         
         payment_intent_id = serializer.validated_data["payment_intent_id"]
 
+        
+        payment = Payment.objects.get(stripe_payment_intent_id=payment_intent_id)
         if not payment_intent_id:
             return Response({"error": "Payment Intent ID is required"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        payment = Payment.objects.get(stripe_payment_intent_id = payment_intent_id)
         expert = payment.expert
 
-        if expert.cancellation_fee_percentage == 0:
+        if not expert.allow_cancellation_fee:
 
             try:
                 stripe.PaymentIntent.cancel(payment_intent_id)
-                payment = Payment.objects.get(stripe_payment_intent_id = payment_intent_id)
                 payment.status = "canceled"
                 payment.save()
                 return Response({"message": "Payment released, no charge applied."})
@@ -65,8 +64,10 @@ class ReleasePaymentView(APIView):
                 return Response({"error": "An unexpected error occured" + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
             
-        if expert.cancellation_fee_percentage > 0:
-            return ChargeCancellationFeeView.as_view()(request)
+        if expert.allow_cancellation_fee :
+            charge_cancel_view = ChargeCancellationFeeView.as_view()
+            return charge_cancel_view(request._request)
+
         
         return Response({"message": "Expert cancellation processed, no fee applied."}, status=status.HTTP_200_OK)
             

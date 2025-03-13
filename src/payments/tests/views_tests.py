@@ -414,3 +414,56 @@ class RefundPaymentViewTest(APITestCase):
         self.assertIn("Refund processed successfully.", response.json()["message"])
         self.assertEqual(response.json()["refund_id"], "refund_123")
         self.assertEqual(self.payment.status, "partially_refunded")
+
+
+class ReleasePaymentViewTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.customer = User.objects.create_user(username="customer", password="password123")
+        self.expert = User.objects.create_user(username="expert", password="password123", is_expert=True, 
+                                               allow_cancellation_fee=False)
+        self.client.force_authenticate(user=self.customer)
+
+        self.payment = Payment.objects.create(
+            customer=self.customer,
+            expert=self.expert,
+            stripe_payment_intent_id="pi_123",
+            amount=100.00,
+            status="authorized",
+        )
+        self.valid_payload = {"payment_intent_id" : "pi_123"}
+        self.invalid_payload = {"payment_intent_id" : "invalid_id"}
+        self.missing = {}
+        self.url = reverse("release_payment")
+
+    @patch("stripe.PaymentIntent.cancel")
+    def test_successful_payment_release(self, mock_stripe_cancel):
+        """Test successful cancellation of a held PaymentIntent."""
+        mock_stripe_cancel.return_value = {"status":"canceled"}
+        response = self.client.post(self.url, self.valid_payload)
+        self.payment.refresh_from_db()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self.payment.status, "canceled")
+        self.assertEqual(response.data["message"], "Payment released, no charge applied.")
+
+    def test_missing_payment_intent_id(self):
+        """Test error when payment_intent_id is missing."""
+        response = self.client.post(self.url, self.invalid_payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("payment_intent_id", response.data) 
+        self.assertEqual(response.data["payment_intent_id"][0].code, "invalid")  
+
+    def test_invalid_payment_intent_id(self):
+        """Test error when payment_intent_id does not exist."""
+        response = self.client.post(self.url, self.invalid_payload)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        error_detail = response.data["payment_intent_id"][0]
+        self.assertEqual(str(error_detail), "Payment not found.")
+
+    @patch("stripe.PaymentIntent.cancel", side_effect=Exception("Stripe API error"))
+    def test_stripe_api_failure(self, mock_stripe_cancel):
+        """Test Stripe API error handling."""
+        response = self.client.post(self.url, self.valid_payload)
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertIn("error", response.data)
+    
