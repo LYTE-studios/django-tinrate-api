@@ -21,7 +21,7 @@ class CreatePaymentIntentView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def post(self, request, *args, **kwargs):
         """
         Handles the creation of a PaymentIntent.
 
@@ -34,8 +34,10 @@ class CreatePaymentIntentView(APIView):
         """
 
         serializer = PaymentSerializer(data=request.data, context={"request": request})
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if serializer.is_valid():
+            payment = serializer.save()  # Create the Payment instance
+            return Response(PaymentSerializer(payment).data, status=status.HTTP_201_CREATED)  # Return serialized data with 'id'
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
         amount = serializer.validated_data["amount"]
         expert_id = serializer.validated_data["expert_id"] #user acting as expert

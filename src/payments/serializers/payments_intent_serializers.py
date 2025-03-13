@@ -21,7 +21,7 @@ class PaymentSerializer(serializers.ModelSerializer):
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)  
     class Meta:
         model = Payment
-        fields = ['expert_id', 'amount', 'status', 'cancellation_fee']
+        fields = ['id','expert_id', 'amount', 'status', 'cancellation_fee']
         
     def validate(self, data):
         """
