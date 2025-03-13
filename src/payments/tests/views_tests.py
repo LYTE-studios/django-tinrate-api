@@ -215,3 +215,77 @@ class ChargeCancellationFeeViewTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Card error:", response.json()["error"])
 
+class CapturePaymentViewTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.customer = User.objects.create_user(username="customer", password="password123")
+        self.expert = User.objects.create_user(username="expert", password="password123", is_expert=True, 
+                                               allow_cancellation_fee=True)
+        self.client.force_authenticate(user=self.customer)
+
+        self.payment = Payment.objects.create(
+            customer=self.customer,
+            expert=self.expert,
+            stripe_payment_intent_id="pi_123",
+            amount=100.00,
+            status="authorized",
+        )
+        self.valid_payload = {"payment_intent_id" : "pi_123"}
+        self.invalid_payload = {"payment_intent_id" : "invalid_id"}
+        self.url = reverse("capture_payment")
+
+    @patch("stripe.PaymentIntent.capture")
+    def test_successful_payment_capture(self, mock_capture):
+        """Test capturing a payment successfully."""
+        response = self.client.post(self.url, self.valid_payload, format="json")
+
+        self.payment.refresh_from_db()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["message"], "Payment captured successfuly.")
+        self.assertEqual(self.payment.status, "captured")
+        
+    def test_missing_payment_intent_id(self):
+        """Test request without payment_intent_id."""
+        response = self.client.post(self.url, {}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("payment_intent_id", response.json())
+
+    @patch("stripe.PaymentIntent.capture", side_effect=stripe.error.InvalidRequestError("Invalid request",
+                                                                                        param="payment_intent_id"))
+    def test_invalid_payment_intent(self, mock_capture):
+        """Test capturing payment with an invalid PaymentIntent ID."""
+        response = self.client.post(self.url, self.invalid_payload, format="json")
+        print(response.content)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Payment with this PaymentIntent ID does not exist.", str(response.data["payment_intent_id"]))
+
+    @patch("stripe.PaymentIntent.capture", side_effect=stripe.error.CardError("Card declined",
+                                                                             param="card",
+                                                                             code="card_declined"))
+    def test_card_error(self, mock_capture):
+        """Test capturing payment when Stripe raises a CardError."""
+        response = self.client.post(self.url, self.valid_payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Card error", response.json()["error"])
+
+    @patch("stripe.PaymentIntent.capture", side_effect=stripe.error.RateLimitError("Too many requests"))
+    def test_rate_limit_error(self, mock_capture):
+        """Test capturing payment when Stripe rate limit is exceeded."""
+        response = self.client.post(self.url, self.valid_payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertIn("Rate limit exceeded. Please try again later.", response.json()["error"])
+        
+    @patch("stripe.PaymentIntent.capture", side_effect=stripe.error.AuthenticationError("Invalid API key"))
+    def test_authentication_error(self, mock_capture):
+        """Test capturing payment when there's an authentication issue with Stripe."""
+        response = self.client.post(self.url, self.valid_payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertIn("Authentication error", response.json()["error"])
+
+    @patch("stripe.PaymentIntent.capture", side_effect=Exception("Unexpected error"))
+    def test_unexpected_error(self, mock_capture):
+        """Test capturing payment when an unkown error occurs."""
+        response = self.client.post(self.url, self.valid_payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertIn("An unexpected error occured", response.json()["error"])
+           

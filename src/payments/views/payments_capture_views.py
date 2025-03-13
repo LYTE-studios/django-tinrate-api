@@ -31,7 +31,7 @@ class CapturePaymentView(APIView):
         Returns:
             - JSON response confirming capture or error message.
         """
-        serializer = CapturePaymentView(data=request.data)
+        serializer = CapturePaymentSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
