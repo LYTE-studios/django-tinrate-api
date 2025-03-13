@@ -12,7 +12,7 @@ class FailedPaymentSerializer(serializers.ModelSerializer):
         created_at (datetime): The timestamp of when the payment attempt was made.
     """
     class Meta:
-        model: Payment
+        model = Payment
         fields = ["id", "amount", "status", "created_at"]
 
     def validate_status(self, value):

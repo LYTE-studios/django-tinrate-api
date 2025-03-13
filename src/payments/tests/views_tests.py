@@ -289,3 +289,56 @@ class CapturePaymentViewTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
         self.assertIn("An unexpected error occured", response.json()["error"])
            
+
+class FailPaymentsViewTest(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.customer = User.objects.create_user(username="customer", password="password123")
+        self.expert = User.objects.create_user(username="expert", password="password123", is_expert=True, 
+                                               allow_cancellation_fee=True)
+        self.client.force_authenticate(user=self.customer)
+
+        self.payment1 = Payment.objects.create(
+            customer=self.customer,
+            expert=self.expert,
+            stripe_payment_intent_id="pi_123",
+            amount=100.00,
+            status="failed",
+        )
+        self.payment2 = Payment.objects.create(
+            customer=self.customer,
+            expert=self.expert,
+            stripe_payment_intent_id="pi_124",
+            amount=100.00,
+            status="failed",
+        )
+        self.url = reverse("fail_payment")
+
+    def test_get_failed_payments(self):
+        """Test to retrieve a list of faile payments for the authenticated user."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(int(response.data[0]["id"]), self.payment1.id)
+        self.assertEqual(int(response.data[1]["id"]), self.payment2.id)
+
+    def test_get_failed_payments_no_results(self):
+        """test if no failed payments are found."""
+        other_user = get_user_model().objects.create_user(username="otheruser", password="password123")
+        self.client.force_authenticate(user=other_user)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data, {"message": "No failed payments found."})
+    
+    def test_get_failed_payments_unauthenticated(self):
+        """Test if an unauthenticated user gets a 401 Unauthorized response."""
+        self.client.logout()
+        response = self.client.get(self.url)
+        print(response.content)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_get_failed_payments_with_error(self):
+        """Test handling internal errors (e.g., database errors)."""
+        with self.assertRaises(Exception):
+            with self.client.force_authenticate(user=self.user):
+                self.client.get(self.url)
