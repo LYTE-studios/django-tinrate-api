@@ -1,3 +1,5 @@
+from datetime import datetime
+from decimal import Decimal
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient, APITestCase
@@ -7,8 +9,10 @@ from django.urls import reverse
 from payments.models.payments_models import Payment
 from payments.serializers.payments_cancel_serializers import CancelPaymentSerializer
 from payments.serializers.payments_capture_serializers import CapturePaymentSerializer
+from payments.serializers.payments_fail_serializers import FailedPaymentSerializer
 from unittest.mock import patch
 import stripe
+import uuid
 
 User = get_user_model()
 
@@ -230,3 +234,42 @@ class CapturePaymentSerializerTest(TestCase):
         with self.assertRaises(ValidationError) as context:
             serializer.is_valid(raise_exception=True)
         self.assertIn("Payment is not in authorized state.", str(context.exception))
+
+
+class FailedPaymentSerializerTest(TestCase):
+    def setUp(self):
+        self.valid_data={
+            "id":uuid.uuid4(),
+            "amount":Decimal("49.99"),
+            "status":"failed",
+            "created_at":datetime.now()
+        }
+        self.invalid_data_status={
+            "id":uuid.uuid4(),
+            "amount":Decimal("49.99"),
+            "status":"captured",
+            "created_at":datetime.now()
+        }
+        self.missing_fields_data={
+            "id":uuid.uuid4(),
+            "status":"failed",
+            "created_at":datetime.now()
+        }
+
+    def test_valid_failed_payments(self):
+        """Test that the serializer is valid when given correct data."""
+        serializer = FailedPaymentSerializer(data=self.valid_data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_invalid_status(self):
+        """Test that the seriallizer raises a validation error for non-failed status."""
+        serializer = FailedPaymentSerializer(data=self.invalid_data_status)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("status", serializer.errors)
+        self.assertEqual(serializer.errors["status"][0], "Only failed payments can be retrieved.")
+
+    def test_missing_required_fields(self):
+        """Test that the serializer fails when required fields are missing."""
+        serializer = FailedPaymentSerializer(data=self.missing_fields_data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("amount", serializer.errors)
