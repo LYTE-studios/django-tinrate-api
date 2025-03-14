@@ -6,6 +6,7 @@ from rest_framework.exceptions import ValidationError
 from django.urls import reverse
 from payments.models.payments_models import Payment
 from payments.serializers.payments_cancel_serializers import CancelPaymentSerializer
+from payments.serializers.payments_capture_serializers import CapturePaymentSerializer
 from unittest.mock import patch
 import stripe
 
@@ -158,3 +159,74 @@ class CancelPaymentSerializerTest(TestCase):
         self.assertTrue(serializer.is_valid())
         self.assertEqual(serializer.validated_data["percentage"], 20.5)
 
+
+class CapturePaymentSerializerTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.customer = User.objects.create_user(username="customer", password="testpass")
+        self.expert = User.objects.create_user(username="expert", password="testpass")
+        self.client.force_authenticate(user=self.customer)
+        self.url = reverse("intent_payment")
+
+        """Set up test data for various payment statuses."""
+        self.payment_authorized = Payment.objects.create(
+            stripe_payment_intent_id="pi_123",
+            status="authorized",
+            amount=50.00,
+            customer=self.customer,
+            expert=self.expert,
+        )
+        self.payment_captured = Payment.objects.create(
+            stripe_payment_intent_id="pi_124",
+            status="captured",
+            amount=50.00,
+            customer=self.customer,
+            expert=self.expert,
+        )
+        self.payment_refunded = Payment.objects.create(
+            stripe_payment_intent_id="pi_126",
+            status="refunded",
+            amount=50.00,
+            customer=self.customer,
+            expert=self.expert,
+        )
+        self.payment_failed = Payment.objects.create(
+            stripe_payment_intent_id="pi_127",
+            status="failed",
+            amount=50.00,
+            customer=self.customer,
+            expert=self.expert,
+        )
+
+    def test_valid_payment_intent_id_authorized(self):
+        """Test that an authorized payment intent ID passes validation."""
+        serializer = CapturePaymentSerializer(data={"payment_intent_id":"pi_123"})
+        self.assertTrue(serializer.is_valid())
+
+    def test_invalid_payment_intent_id_not_found(self):
+        """Test that a non-existent payment intent ID raises a validation error."""
+        serializer = CapturePaymentSerializer(data={"payment_intent_id":"pi_non_existent"})
+        with self.assertRaises(ValidationError) as context:
+            serializer.is_valid(raise_exception=True)
+        self.assertIn("Payment with this PaymentIntent ID does not exist.", str(context.exception))
+
+    def test_invalid_payment_intent_id_captured(self):
+        """Test that an already captured payment intent ID raises a validation error."""
+        serializer = CapturePaymentSerializer(data={"payment_intent_id":"pi_124"})
+        with self.assertRaises(ValidationError) as context:
+            serializer.is_valid(raise_exception=True)
+        self.assertIn("Payment has already been captured.", str(context.exception))
+
+    def test_invalid_payment_intent_id_refunded(self):
+        """Test that a refunded payment intent ID raises a validation error."""
+        serializer = CapturePaymentSerializer(data={"payment_intent_id":"pi_126"})
+        with self.assertRaises(ValidationError) as context:
+            serializer.is_valid(raise_exception=True)
+        self.assertIn("Refunded payments cannot be captured.", str(context.exception))
+    
+    def test_invalid_payment_intent_id_wrong_status(self):
+        """Test that a payment intent ID with a non-authorized status raises a validation error."""
+        serializer = CapturePaymentSerializer(data={"payment_intent_id":"pi_127"})
+        with self.assertRaises(ValidationError) as context:
+            serializer.is_valid(raise_exception=True)
+        self.assertIn("Payment is not in authorized state.", str(context.exception))
