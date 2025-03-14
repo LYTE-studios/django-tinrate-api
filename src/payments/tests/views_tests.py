@@ -1,3 +1,4 @@
+import json
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient, APITestCase
@@ -467,3 +468,49 @@ class ReleasePaymentViewTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
         self.assertIn("error", response.data)
     
+
+class StripeWebhookViewTest(APITestCase):
+    def setUp(self):
+        self.customer = User.objects.create_user(username="customer", password="password123")
+        self.expert = User.objects.create_user(username="expert", password="password123", is_expert=True, 
+                                               allow_cancellation_fee=False)
+        self.client.force_authenticate(user=self.customer)
+        self.payment_intent_id = 'pi_123'
+        self.payment = Payment.objects.create(
+            customer=self.customer,
+            expert=self.expert,
+            stripe_payment_intent_id=self.payment_intent_id,
+            amount=100.00,
+            status="authorized",
+        )
+        self.url = reverse("stripe_webhook")
+
+    @patch('stripe.Webhook.construct_event')
+    @patch("payments.tasks.handle_stripe_event.delay")
+    def test_handle_payment_intent_succeeded_event(self, mock_stripe_event, mock_construct_event, mock_handle_stripe_event):
+        """
+        Test that when a 'payment_intent.succeeded' event is received, the payment 
+        status is updated to 'captured'.
+        """
+        mock_stripe_event.return_value = {
+            'type':'payment_intent.succeeded',
+            'data': {
+                'object': {
+                    'id': self.payment_intent_id,
+                    'amount_received': 100,
+                    'status': 'succeeded',
+                }
+            }
+        }
+        mock_construct_event.return_value = mock_stripe_event
+        response = self.client.post(self.url, 
+                                json.dumps(mock_stripe_event),
+                                content_type='application/json', 
+                                HTTP_STRIPE_SIGNATURE="test_signature")
+        print(response.content)
+        print(response.json())
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_handle_stripe_event.assert_called_with(mock_stripe_event)
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.status, 'captured')

@@ -33,10 +33,11 @@ class StripeWebhookView(APIView):
         """
         payload = request.body
         sig_header = request.headers.get("Stripe-Signature")
+        logger.info(f"Raw Stripe payload: {payload.decode('utf-8')}")
 
         try:
             #verify Stripe signature
-            event = stripe.webhook.construct_event(
+            event = stripe.Webhook.construct_event(
                 payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
             )
         except ValueError as e:

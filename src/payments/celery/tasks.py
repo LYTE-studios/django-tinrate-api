@@ -13,8 +13,9 @@ def handle_stripe_event(event):
     Args:
         event (dict): The Stripe event payload received from the webhook.
     """
+    logger.info(f"Received event in Celery: {event}")
     event_type = event.get("type")
-    data = event.get("data", {}).get("objects", {})
+    data = event.get("data", {}).get("object", {})
 
     if not event_type or not data:
         logger.error("Invalid event structure received from Stripe.")
@@ -25,6 +26,8 @@ def handle_stripe_event(event):
         payment = Payment.objects.get(stripe_payment_intent_id=data.get('id'))
     except Payment.DoesNotExist:
         return f"Payment with intent ID {data.get('id')} not found."
+    
+    logger.info(f"Processing event {event_type} for payment {payment.id}")
     
     #mapping Stripe events to model choices
     status_mapping = {
