@@ -486,13 +486,13 @@ class StripeWebhookViewTest(APITestCase):
         self.url = reverse("stripe_webhook")
 
     @patch('stripe.Webhook.construct_event')
-    @patch("payments.tasks.handle_stripe_event.delay")
-    def test_handle_payment_intent_succeeded_event(self, mock_stripe_event, mock_construct_event, mock_handle_stripe_event):
+    @patch("payments.celery.tasks.handle_stripe_event.delay")
+    def test_handle_payment_intent_succeeded_event(self, mock_handle_stripe_event, mock_construct_event):
         """
         Test that when a 'payment_intent.succeeded' event is received, the payment 
         status is updated to 'captured'.
         """
-        mock_stripe_event.return_value = {
+        mock_stripe_event = {
             'type':'payment_intent.succeeded',
             'data': {
                 'object': {
@@ -503,6 +503,7 @@ class StripeWebhookViewTest(APITestCase):
             }
         }
         mock_construct_event.return_value = mock_stripe_event
+        payload = json.dumps(mock_stripe_event).encode('utf-8')
         response = self.client.post(self.url, 
                                 json.dumps(mock_stripe_event),
                                 content_type='application/json', 

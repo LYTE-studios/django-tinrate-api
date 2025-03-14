@@ -31,6 +31,7 @@ def handle_stripe_event(event):
     
     #mapping Stripe events to model choices
     status_mapping = {
+        "payment_intent.authorized":"authorized",
         "payment_intent.succeeded": "captured",
         "payment_intent.payment_failed": "failed",
         "payment_intent.canceled" : "canceled",
@@ -42,6 +43,8 @@ def handle_stripe_event(event):
 
     new_status = status_mapping.get(event_type)
     if new_status:
+        
+        
         payment.status = new_status
         payment.save()
         logger.info(f"Updated payment {payment.id} status to {new_status}.")
