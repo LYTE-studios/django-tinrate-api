@@ -327,8 +327,8 @@ class FailPaymentsViewTest(APITestCase):
         other_user = get_user_model().objects.create_user(username="otheruser", password="password123")
         self.client.force_authenticate(user=other_user)
         response = self.client.get(self.url)
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data, {"message": "No failed payments found."})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data,[])
     
     def test_get_failed_payments_unauthenticated(self):
         """Test if an unauthenticated user gets a 401 Unauthorized response."""
