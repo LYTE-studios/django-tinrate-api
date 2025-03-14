@@ -4,12 +4,13 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient, APITestCase
 from rest_framework import status
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, NotFound
 from django.urls import reverse
 from payments.models.payments_models import Payment
 from payments.serializers.payments_cancel_serializers import CancelPaymentSerializer
 from payments.serializers.payments_capture_serializers import CapturePaymentSerializer
 from payments.serializers.payments_fail_serializers import FailedPaymentSerializer
+from payments.serializers.payments_refund_serializers import RefundPaymentSerializer
 from unittest.mock import patch
 import stripe
 import uuid
@@ -273,3 +274,88 @@ class FailedPaymentSerializerTest(TestCase):
         serializer = FailedPaymentSerializer(data=self.missing_fields_data)
         self.assertFalse(serializer.is_valid())
         self.assertIn("amount", serializer.errors)
+
+
+class RefundPaymentSerializerTest(TestCase):
+    def setUp(self):
+        self.customer = User.objects.create_user(username="customer", password="testpass")
+        self.expert = User.objects.create_user(username="expert", password="testpass")
+        self.payment_intent_id = uuid.uuid4()
+        self.payment = Payment.objects.create(
+            stripe_payment_intent_id=str(self.payment_intent_id),
+            status="authorized",
+            amount=100.00,
+            customer=self.customer,
+            expert=self.expert,
+        )
+        self.valid_data={
+            "payment_intent_id":str(self.payment_intent_id),
+            "refund_amount":Decimal("50.00")
+        }
+        self.invalid_data_amount={
+            "payment_intent_id":str(self.payment_intent_id),
+            "refund_amount":Decimal("-10.00")
+        }
+        self.excessive_refund_amount={
+            "payment_intent_id":str(self.payment_intent_id),
+            "refund_amount":Decimal("150.00")
+        }
+        self.invalid_payment_intent={
+            "payment_intent_id":"invalid_intent_id",
+            "refund_amount":Decimal("50.00")
+        }
+
+    def test_valid_refund_payment(self):
+        """Test that the serializer is valid whe given correct data."""
+        serializer = RefundPaymentSerializer(data=self.valid_data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_invalid_refund_amount(self):
+        """
+        Test that the serializer raises a validation error when the refund amount
+        is less than or equal to 0.
+        """
+        serializer = RefundPaymentSerializer(data=self.invalid_data_amount)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("non_field_errors", serializer.errors)
+        self.assertEqual(serializer.errors["non_field_errors"][0], "Refund amount must be greater than 0.")
+
+    def test_excessive_refund_amount(self):
+        """
+        Test that the serializer raises a vaidation error if the refund amount
+        exceeds the total payment amount.
+        """
+        serializer = RefundPaymentSerializer(data=self.excessive_refund_amount)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("refund_amount", serializer.errors)
+        self.assertEqual(serializer.errors["refund_amount"][0], "Refund amount cannot exceed the total payment amount.")
+
+    def test_invalid_payment_intent_id(self):
+        """Test that the serializer raises a validation error when the payment intent ID does not exist."""
+        serializer = RefundPaymentSerializer(data=self.invalid_payment_intent)
+        with self.assertRaises(NotFound):
+            serializer.is_valid(raise_exception=True)
+
+    def test_already_refunded_payment(self):
+        """Test that the serializer raises a validation error when the payment has already been refunded."""
+        self.payment.status = "refunded"
+        self.payment.save()
+        serializer = RefundPaymentSerializer(data=self.valid_data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("payment_intent_id", serializer.errors)
+        self.assertEqual(serializer.errors["payment_intent_id"][0], "Payment has already been refunded.")
+
+    def test_invalid_payment_status(self):
+        """
+        Test that the serializer raises a validation error if the payment status is 
+        not authorized or captured.
+        """
+        self.payment.status = "failed"
+        self.payment.save()
+        serializer = RefundPaymentSerializer(data=self.valid_data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("payment_intent_id", serializer.errors)
+        self.assertEqual(serializer.errors["payment_intent_id"][0], "Only authorized and captured payments can be refunded.")
+
+
+
