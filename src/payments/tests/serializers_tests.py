@@ -11,6 +11,7 @@ from payments.serializers.payments_cancel_serializers import CancelPaymentSerial
 from payments.serializers.payments_capture_serializers import CapturePaymentSerializer
 from payments.serializers.payments_fail_serializers import FailedPaymentSerializer
 from payments.serializers.payments_refund_serializers import RefundPaymentSerializer
+from payments.serializers.payments_release_serializers import ReleasePaymentSerializer
 from unittest.mock import patch
 import stripe
 import uuid
@@ -358,4 +359,58 @@ class RefundPaymentSerializerTest(TestCase):
         self.assertEqual(serializer.errors["payment_intent_id"][0], "Only authorized and captured payments can be refunded.")
 
 
+class ReleasePaymentSerializerTest(TestCase):
+    def setUp(self):
+        self.customer = User.objects.create_user(username="customer", password="testpass")
+        self.expert = User.objects.create_user(username="expert", password="testpass")
+        self.payment_authorized = Payment.objects.create(
+        stripe_payment_intent_id=str(uuid.uuid4()),
+        amount=Decimal("49.99"),
+        status="authorized",
+        created_at=datetime.now(),
+        customer=self.customer,
+        expert=self.expert,
+        )
+        self.payment_canceled = Payment.objects.create(
+        stripe_payment_intent_id=str(uuid.uuid4()),
+        amount=Decimal("49.99"),
+        status="canceled",
+        created_at=datetime.now(),
+        customer=self.customer,
+        expert=self.expert,
+        )
+        self.payment_captured = Payment.objects.create(
+        stripe_payment_intent_id=str(uuid.uuid4()),
+        amount=Decimal("49.99"),
+        status="captured",
+        created_at=datetime.now(),
+        customer=self.customer,
+        expert=self.expert,
+        )
+        self.valid_data={"payment_intent_id": str(self.payment_authorized.stripe_payment_intent_id)}
+        self.invalid_data_not_found={"payment_intent_id": "non_existent_id"}
+        self.invalid_data_released={"payment_intent_id": str(self.payment_canceled.stripe_payment_intent_id)}
+        self.invalid_data={"payment_intent_id": str(self.payment_captured.stripe_payment_intent_id)}
 
+    def test_valid_release_payment(self):
+        """Test that the serializer is valid when  given correct data."""
+        serializer = ReleasePaymentSerializer(data=self.valid_data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_invalid_payment_intent_id_not_found(self):
+        """Test that the serializer raises a validation error when the payment intent ID does not exist."""
+        serializer = ReleasePaymentSerializer(data=self.invalid_data_not_found)
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(serializer.errors['payment_intent_id'][0], "Payment not found.")
+
+    def test_invalid_payment_intent_id_already_released(self):
+        """Test that the serializer raises a validation error when the payment has already been released."""
+        serializer = ReleasePaymentSerializer(data=self.invalid_data_released)
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(serializer.errors['payment_intent_id'][0], "Payment has already been released.")
+
+    def test_invalid_payment_intent_id_invalid_status(self):
+        """Test that the serializer raises a validation error when the payment is in an invalid state for release."""
+        serializer = ReleasePaymentSerializer(data=self.invalid_data)
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(serializer.errors['payment_intent_id'][0], "Payment cannot be released because it is in an invalid state.")

@@ -30,7 +30,7 @@ class ReleasePaymentSerializer(serializers.Serializer):
         except Payment.DoesNotExist:
             raise serializers.ValidationError("Payment not found.")
         
-        if payment.status == "released":
+        if payment.status == "canceled":
             raise serializers.ValidationError("Payment has already been released.")
         if payment.status not in ["authorized", "canceled"]:
             raise serializers.ValidationError("Payment cannot be released because it is in an invalid state.")
