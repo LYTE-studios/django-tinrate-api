@@ -164,6 +164,7 @@ LOGGING = {
     "disable_existing_loggers": False,
     "handlers": {
         "console": {
+            "level": "INFO",
             "class": "logging.StreamHandler",
         },
     },
@@ -171,4 +172,11 @@ LOGGING = {
         "handlers": ["console"],
         "level": "DEBUG",
     },
+    "loggers": {
+        'celery': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    }
 }

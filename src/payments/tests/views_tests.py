@@ -4,9 +4,11 @@ from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient, APITestCase
 from rest_framework import status
 from django.urls import reverse
+from payments.celery.tasks import handle_stripe_event
 from payments.models.payments_models import Payment
 from unittest.mock import patch
 import stripe
+import time
 
 User = get_user_model()
 
@@ -478,11 +480,12 @@ class StripeWebhookViewTest(APITestCase):
             amount=100.00,
             status="authorized",
         )
+        self.payment.refresh_from_db()
         self.url = reverse("stripe_webhook")
+        return self.payment.id
 
     @patch('stripe.Webhook.construct_event')
-    @patch("payments.celery.tasks.handle_stripe_event.delay")
-    def test_handle_payment_intent_succeeded_event(self, mock_handle_stripe_event, mock_construct_event):
+    def test_handle_payment_intent_succeeded_event(self, mock_construct_event):
         """
         Test that when a 'payment_intent.succeeded' event is received, the payment 
         status is updated to 'captured'.
@@ -498,14 +501,21 @@ class StripeWebhookViewTest(APITestCase):
             }
         }
         mock_construct_event.return_value = mock_stripe_event
-        payload = json.dumps(mock_stripe_event).encode('utf-8')
-        response = self.client.post(self.url, 
-                                json.dumps(mock_stripe_event),
-                                content_type='application/json', 
-                                HTTP_STRIPE_SIGNATURE="test_signature")
-   
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        mock_handle_stripe_event.assert_called_with(mock_stripe_event)
-        self.payment.refresh_from_db()
-        self.assertEqual(self.payment.status, 'captured')
+        with patch('payments.celery.tasks.handle_stripe_event.delay') as mock_delay:
+             # Configure mock_delay to actually execute the task
+            mock_delay.side_effect = lambda event: handle_stripe_event(event)
+
+            response = self.client.post(self.url, 
+                                    json.dumps(mock_stripe_event),
+                                    content_type='application/json', 
+                                    HTTP_STRIPE_SIGNATURE="test_signature")
+
+    
+
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+            mock_delay.assert_called_with(mock_stripe_event)
+            self.payment.refresh_from_db()
+            self.assertEqual(self.payment.status, 'captured')
+
+        

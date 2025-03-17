@@ -49,6 +49,17 @@ class StripeWebhookView(APIView):
         
         logger.info(f"Recevied Stripe webhook: {event['type']}")
         
-        handle_stripe_event.delay(event)
+        logger.info("About to trigger Celery task: handle_stripe_event")
+        event_dic = {
+            'type': event['type'],
+            'data': {
+                'object': {
+                    'id': event['data']['object'].get('id'),
+                    'status': event['data']['object'].get('status'),
+                    'amount_received': event['data']['object'].get('amount_received'),
+                }
+            }
+        }
+        handle_stripe_event.delay(event_dic)
 
         return JsonResponse({"message": "Webhook received"}, status=status.HTTP_200_OK)

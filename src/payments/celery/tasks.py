@@ -1,9 +1,11 @@
 from celery import shared_task
+from django.conf import settings
 from payments.models.payments_models import Payment
 import stripe
 import logging
 
 logger = logging.getLogger(__name__)
+logger.info(f"Database settings: {settings.DATABASES['default']}")
 
 @shared_task
 def handle_stripe_event(event):
@@ -15,11 +17,16 @@ def handle_stripe_event(event):
     """
     logger.info(f"Received event in Celery: {event}")
     event_type = event.get("type")
+    logger.info(f"Event type: {event_type}")
+
     data = event.get("data", {}).get("object", {})
 
     if not event_type or not data:
         logger.error("Invalid event structure received from Stripe.")
         return "Invalid event structure."
+    
+    logger.info(f"Looking for payment with intent ID: {data.get('id')}")
+
 
     try:
         # Fetch the payment record based on the PaymentIntent ID
