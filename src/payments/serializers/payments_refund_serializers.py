@@ -1,5 +1,4 @@
-from requests import Response
-from rest_framework import serializers, status
+from rest_framework import serializers
 from rest_framework.exceptions import NotFound
 from payments.models.payments_models import Payment
 
@@ -32,7 +31,6 @@ class RefundPaymentSerializer(serializers.Serializer):
             ValidationError: If the refund amount is less than or equal to zero.
         """
         refund_amount = data.get("refund_amount")
-        print(f"Received refund_amount: {refund_amount}")
         if refund_amount is not None and refund_amount <= 0:
             raise serializers.ValidationError({"non_field_errors": ["Refund amount must be greater than 0."]})
         return data

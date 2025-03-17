@@ -53,8 +53,6 @@ class PaymentSerializerTest(APITestCase):
         """Test creating payment with invalid expert_id."""
         data = {"amount":100.00, "expert_id": 5555}
         response = self.client.post(self.url, data, format="json")
-        print(response.content)
-        print(response.data)
         error_message = "Expert not found."
         found_error = any(error == error_message for error in response.data)
         

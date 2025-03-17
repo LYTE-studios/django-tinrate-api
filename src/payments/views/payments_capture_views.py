@@ -37,8 +37,10 @@ class CapturePaymentView(APIView):
         
         payment_intent_id = serializer.validated_data['payment_intent_id']
 
-        if not payment_intent_id:
-            return Response({"error": "Payment Intent ID is required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            payment = Payment.objects.get(stripe_payment_intent_id=payment_intent_id)
+        except Payment.DoesNotExist:
+            return Response({"error": "Payment not found."}, status=status.HTTP_404_NOT_FOUND)
         
         try:
             stripe.PaymentIntent.capture(payment_intent_id)
@@ -46,16 +48,18 @@ class CapturePaymentView(APIView):
             payment.status = "captured"
             payment.save()
             return Response({"message":"Payment captured successfuly."})
+        
         except stripe.error.CardError as e:
-            return Response({"error": "Card error:" + str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Card error: " + str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except stripe.error.RateLimitError as e:
             return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
         except stripe.error.InvalidRequestError as e:
-            return Response({"error": "Invalid request:" + str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Invalid request: " + str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except stripe.error.AuthenticationError as e:
-            return Response({"error": "Authentication error:" + str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"error": "Authentication error: " + str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except stripe.error.StripeError as e:
-            return Response({"error": "Stripe API error:" + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": "Stripe API error: " + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
-            return Response({"error": "An unexpected error occured" + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-       
+            return Response({"error": "An unexpected error occurred" + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+            

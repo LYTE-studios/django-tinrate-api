@@ -1,4 +1,4 @@
-from rest_framework import generics, permissions, status
+from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.core.exceptions import ObjectDoesNotExist
@@ -34,11 +34,17 @@ class FailPaymentsView(generics.ListAPIView):
         Returns:
             Response: JSON response containing failed payments or an error message.
         """
-    
-        queryset = self.get_queryset()
-        if not queryset.exists():
-            return Response([], status=status.HTTP_200_OK)
+        try:
+            queryset = self.get_queryset()
+            if not queryset.exists():
+                return Response({"message":"No failed payments found."}, status=status.HTTP_200_OK)
 
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Payment.DoesNotExist:
+            return Response({"error": "No failed payments exist for this user."}, status=status.HTTP_404_NOT_FOUND)
         
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            

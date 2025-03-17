@@ -29,7 +29,6 @@ class CreatePaymentIntentViewTest(TestCase):
 
         data = {"amount": 50.00, "expert_id": int(self.expert.id), "customer_id":self.customer.id}
         response = self.client.post(self.url, data, format="json")
-        print(response.content)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("payment_intent", response.data)
@@ -256,7 +255,6 @@ class CapturePaymentViewTest(TestCase):
     def test_invalid_payment_intent(self, mock_capture):
         """Test capturing payment with an invalid PaymentIntent ID."""
         response = self.client.post(self.url, self.invalid_payload, format="json")
-        print(response.content)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Payment with this PaymentIntent ID does not exist.", str(response.data["payment_intent_id"]))
 
@@ -288,7 +286,7 @@ class CapturePaymentViewTest(TestCase):
         """Test capturing payment when an unkown error occurs."""
         response = self.client.post(self.url, self.valid_payload, format="json")
         self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
-        self.assertIn("An unexpected error occured", response.json()["error"])
+        self.assertIn("An unexpected error occurred", response.json()["error"])
            
 
 class FailPaymentsViewTest(APITestCase):
@@ -329,13 +327,12 @@ class FailPaymentsViewTest(APITestCase):
         self.client.force_authenticate(user=other_user)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data,[])
+        self.assertIn("No failed payments found.", response.json()["message"])
     
     def test_get_failed_payments_unauthenticated(self):
         """Test if an unauthenticated user gets a 401 Unauthorized response."""
         self.client.logout()
         response = self.client.get(self.url)
-        print(response.content)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_get_failed_payments_with_error(self):
@@ -390,8 +387,6 @@ class RefundPaymentViewTest(APITestCase):
             "payment_intent_id":self.payment.stripe_payment_intent_id,
             "refund_amount":-10.00,
         })
-        print(response.content)
-        print(response.data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Refund amount must be greater than 0.", response.json()["non_field_errors"])
         mock_refund_create.assert_not_called()
@@ -508,8 +503,7 @@ class StripeWebhookViewTest(APITestCase):
                                 json.dumps(mock_stripe_event),
                                 content_type='application/json', 
                                 HTTP_STRIPE_SIGNATURE="test_signature")
-        print(response.content)
-        print(response.json())
+   
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         mock_handle_stripe_event.assert_called_with(mock_stripe_event)

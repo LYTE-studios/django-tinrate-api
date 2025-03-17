@@ -43,50 +43,51 @@ class RefundPaymentView(APIView):
         serializer = RefundPaymentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-                
+        
         payment_intent_id = serializer.validated_data["payment_intent_id"]
         refund_amount = serializer.validated_data.get("refund_amount")
-
-        #ensure payment_intent_id is provided
-        if not payment_intent_id:
-            return Response({"error": "Payment Intent ID is required"}, status=status.HTTP_400_BAD_REQUEST)
         
         #retrieve the payment object from the database
         try:
-            payment = Payment.objects.get(stripe_payment_intent_id = payment_intent_id)
+            payment = Payment.objects.get(stripe_payment_intent_id=payment_intent_id)
         except Payment.DoesNotExist:
-            raise NotFound({"error": "Payment not found."})
+            return Response({"error": "Payment not found."}, status=status.HTTP_404_NOT_FOUND)
         
         #process refund 
+        if refund_amount is not None:
+            try:
+                refund_amount = float(refund_amount)
+                if refund_amount <= 0:
+                    return Response({"error": "Refund amount must be greater than zero."}, status=status.HTTP_400_BAD_REQUEST)
+                if refund_amount > payment.amount:
+                    return Response({"error": "Refund amount exceeds original payment amount."}, status=status.HTTP_400_BAD_REQUEST)
+            except (TypeError, ValueError):
+                return Response({"error": "Invalid refund amount format."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Process refund via Stripe
         try:
-            if refund_amount is not None:
-                #if refund_amount is provided, process a partial refund
+            if refund_amount:
                 refund = stripe.Refund.create(
                     payment_intent=payment_intent_id,
-                    amount=int(refund_amount * 100)
+                    amount=int(refund_amount * 100)  # Convert to cents
                 )
                 payment.status = "partially_refunded"
-                payment.save()
             else:
-                #if not refund_amount is provided, process a full refund
                 refund = stripe.Refund.create(payment_intent=payment_intent_id)
                 payment.status = "refunded"
-                payment.save()
 
-            return Response({"message": "Refund processed successfully.", "refund_id": refund["id"]})
+            payment.save()
+            return Response({"message": "Refund processed successfully.", "refund_id": refund["id"]}, status=status.HTTP_200_OK)
         
         except stripe.error.CardError as e:
-            return Response({"error": "Card error:" + str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Card error: " + str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except stripe.error.RateLimitError as e:
             return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
         except stripe.error.InvalidRequestError as e:
-            return Response({"error": "Invalid request:" + str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Invalid request: " + str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except stripe.error.AuthenticationError as e:
-            return Response({"error": "Authentication error:" + str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"error": "Authentication error: " + str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except stripe.error.StripeError as e:
-            return Response({"error": "Stripe API error:" + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": "Stripe API error: " + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
-            return Response({"error": "An unexpected error occured" + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+            return Response({"error": "An unexpected error occurred" + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -70,8 +70,9 @@ class CreatePaymentIntentView(APIView):
         except stripe.error.StripeError as e:
             return Response({"error": "Stripe API error: " + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
-            return Response({"error": "An unexpected error occurred: " + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+            return Response({"error": "An unexpected error occurred" + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+            
         try:
             #store the payment in the database
             intent_id = intent.get("id") if isinstance(intent, dict) else intent.id

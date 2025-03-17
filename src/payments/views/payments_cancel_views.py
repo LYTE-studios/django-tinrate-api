@@ -40,20 +40,30 @@ class ChargeCancellationFeeView(APIView):
         payment_intent_id = serializer.validated_data['payment_intent_id']
         percentage = serializer.validated_data.get('percentage') 
 
-        if not payment_intent_id:
-            return Response({"error": "Payment Intent ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            payment = Payment.objects.get(stripe_payment_intent_id=payment_intent_id)
+        except Payment.DoesNotExist:
+            return Response({"error": "Payment not found."}, status=status.HTTP_404_NOT_FOUND)
         
-        payment = Payment.objects.get(stripe_payment_intent_id = payment_intent_id)
         
         #check if the expert has set a cancellation fee 
-        expert = payment.expert
+        expert = getattr(payment, "expert", None)
         if expert.is_expert and not expert.allow_cancellation_fee:
                 return Response({"message": "Expert does not charge cancellation fee."}, status=status.HTTP_200_OK)
             
         if expert.allow_cancellation_fee and percentage is None:
             return Response({"error": "Cancellation percentage is required."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            percentage = float(percentage)
+            if not (0 < percentage <= 100):
+                return Response({"error": "Percentage must be between 1 and 100."}, status=status.HTTP_400_BAD_REQUEST)
+        except (TypeError, ValueError):
+            return Response({"error": "Invalid percentage value."}, status=status.HTTP_400_BAD_REQUEST)
 
         amount_to_charge = float(payment.amount) * (float(percentage) / 100)
+        if amount_to_charge <= 0:
+            return Response({"error": "No cancellation fee charged."}, status=status.HTTP_200_OK)
 
         try:
             stripe.PaymentIntent.capture(payment_intent_id, amount_to_charge=int(amount_to_charge * 100))
@@ -63,15 +73,16 @@ class ChargeCancellationFeeView(APIView):
             return Response({"message": f"Captured {percentage:.0f}% cancellation fee."})
         
         except stripe.error.CardError as e:
-            return Response({"error": "Card error:" + str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Card error: " + str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except stripe.error.RateLimitError as e:
             return Response({"error": "Rate limit exceeded. Please try again later."}, status=status.HTTP_429_TOO_MANY_REQUESTS)
         except stripe.error.InvalidRequestError as e:
-            return Response({"error": "Invalid request:" + str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Invalid request: " + str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except stripe.error.AuthenticationError as e:
-            return Response({"error": "Authentication error:" + str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"error": "Authentication error: " + str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         except stripe.error.StripeError as e:
-            return Response({"error": "Stripe API error:" + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": "Stripe API error: " + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
-            return Response({"error": "An unexpected error occured" + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-       
+            return Response({"error": "An unexpected error occurred" + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+            
