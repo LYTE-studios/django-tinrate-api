@@ -48,7 +48,7 @@ class ChargeCancellationFeeView(APIView):
         
         #check if the expert has set a cancellation fee 
         expert = getattr(payment, "expert", None)
-        if expert.is_expert and not expert.allow_cancellation_fee:
+        if expert and not expert.allow_cancellation_fee:
                 return Response({"message": "Expert does not charge cancellation fee."}, status=status.HTTP_200_OK)
             
         if expert.allow_cancellation_fee and percentage is None:
