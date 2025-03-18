@@ -1,8 +1,10 @@
 import uuid
 from django.db import models
-from django.contrib.auth import get_user_model
+import uuid
+from django.conf import settings
+from django.utils.timezone import now
 
-User = get_user_model()
+
 
 class Payment(models.Model):
     """
@@ -18,12 +20,12 @@ class Payment(models.Model):
         cancellation_fee (Decimal): The percentage of the charge if the customer cancels late.
         created_at (datetime): The timestamp when the payment was created.
     """
-    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name="payments_made")
-    expert = models.ForeignKey(User, on_delete=models.CASCADE, related_name="payments_received")
+    customer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="payments_made")
+    expert = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="payments_received")
     stripe_payment_intent_id = models.CharField(max_length=255, unique=True)
     payment_method_id = models.CharField(max_length=255, null=True, blank=True) 
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    transaction_fee = models.DecimalField(max_digits=5, decimal_places=2)
+    transaction_fee = models.DecimalField(max_digits=5, decimal_places=2, default=0.0)
     status = models.CharField(
         max_length=50,
         choices=[
@@ -61,7 +63,7 @@ class Transaction(models.Model):
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user_id = models.OneToOneField(User, on_delete=models.CASCADE, related_name="transactions")
+    user_id = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="transactions")
     payment = models.ForeignKey("Payment", on_delete=models.SET_NULL, null=True, related_name="payments")
     type = models.CharField(max_length=50, choices=[("charge", "Charge"), ("withdrawal", "Withdrawal")])
     status = models.CharField(max_length=50, choices=[
@@ -93,7 +95,7 @@ class Billing(models.Model):
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user_id = models.OneToOneField(User, on_delete=models.CASCADE, related_name="billing")
+    user_id = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="billing")
     total_earnings = models.DecimalField(max_digits=5, decimal_places=2)
     balance = models.DecimalField(max_digits=5, decimal_places=2)
     amount = models.DecimalField(max_digits=5, decimal_places=2)

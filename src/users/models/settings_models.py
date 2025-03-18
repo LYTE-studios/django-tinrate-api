@@ -1,6 +1,9 @@
 import uuid
 from django.db import models
-from models.user_models import User
+from .user_models import User
+from django.conf import settings
+from django.utils.timezone import now
+
 
 
 class Settings(models.Model):
@@ -16,7 +19,7 @@ class Settings(models.Model):
         support_help (JSON): The user's support help information stored as JSON data.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="settings")
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="settings")
     profile = models.JSONField(null=True, blank=True)
     account_security = models.JSONField(null=True, blank=True)
     notification_pref = models.JSONField(null=True, blank=True)

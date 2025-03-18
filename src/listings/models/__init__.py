@@ -1,1 +1,1 @@
-from .listings_models import Listing
+from .listings_models import *

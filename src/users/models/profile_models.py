@@ -1,7 +1,10 @@
 import uuid
 from django.db import models
-from models.user_models import User
-from models.profile_models import Role, Company
+from .user_models import User
+from django.conf import settings
+from django.utils.timezone import now
+
+
 
 class UserProfile(models.Model):
     """
@@ -36,13 +39,13 @@ class UserProfile(models.Model):
     """
 
 
-    user_id = models.OneToOneField(User, on_delete=models.CASCADE, related_name="user_profile")
-    role = models.ForeignKey(Role, on_delete=models.CASCADE, related_name="user_profiles")
-    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="user_profiles")
+    user_id = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="user_profile")
+    role = models.ForeignKey("Role", on_delete=models.CASCADE, related_name="user_profiles")
+    company = models.ForeignKey("Company", on_delete=models.CASCADE, related_name="user_profiles")
     description = models.TextField(max_length=500, null=True)
     profile_picture = models.CharField(max_length=64, null=True)
     total_meetings = models.IntegerField(default=0)
-    rating = models.DecimalField(max_digits=2, decimal_places=2, null=True)
+    rating = models.DecimalField(max_digits=4, decimal_places=2, null=True, default=0.0)
 
     # Career info
     career_title = models.CharField(max_length=64, null=True)
@@ -57,7 +60,7 @@ class UserProfile(models.Model):
     education_description = models.TextField(max_length=500, null=True)
     education_picture = models.CharField(max_length=64, null=True)
 
-    experience_id = models.ForeignKey("Experience", on_delete=models.SET_NULL, null=True, related_name="experiences")
+    experience_id = models.ForeignKey("Experience", on_delete=models.SET_NULL, null=True, related_name="user_experiences")
 
     def __str__(self):
         return f"Profile of {self.user.username}"
@@ -113,7 +116,7 @@ class Company(models.Model):
         __str__: Returns a human-readable string representation of the company name.
     """
     name = models.CharField(max_length=64)
-    description = models.TextField()
+    description = models.TextField(max_length=1000, null=True)
 
     def __str__(self):
         return self.name
