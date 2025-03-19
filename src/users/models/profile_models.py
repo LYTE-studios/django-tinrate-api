@@ -65,6 +65,9 @@ class UserProfile(models.Model):
     def __str__(self):
         return f"Profile of {self.user.username}"
     
+    class Meta:
+        db_table = "user_profile"
+    
 
 
 
@@ -88,6 +91,9 @@ class Experience(models.Model):
     def __str__(self):
         return self.name
     
+    class Meta:
+        db_table = "user_experience"
+    
 
 class Role(models.Model):
     """
@@ -103,6 +109,9 @@ class Role(models.Model):
 
     def __str__(self):
         return self.name
+    
+    class Meta:
+        db_table = "user_role"
 
 class Company(models.Model):
     """
@@ -120,6 +129,9 @@ class Company(models.Model):
 
     def __str__(self):
         return self.name
+    
+    class Meta:
+        db_table = "user_company"
 
 
 

@@ -20,6 +20,7 @@ class Payment(models.Model):
         cancellation_fee (Decimal): The percentage of the charge if the customer cancels late.
         created_at (datetime): The timestamp when the payment was created.
     """
+    id = models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True)
     customer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="payments_made")
     expert = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="payments_received")
     stripe_payment_intent_id = models.CharField(max_length=255, unique=True)

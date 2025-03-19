@@ -2,13 +2,17 @@ from django.urls import path, include
 from .views.payments_release_views import ReleasePaymentView
 from .views.payments_cancel_views import ChargeCancellationFeeView
 from .views.payments_capture_views import CapturePaymentView
-from .views.payments_intent_views import CreatePaymentIntentView
+from .views.payments_intent_views import CreatePaymentIntentView, PaymentHistoryView, TransactionHistoryView, BillingHistoryView
+
 from .views.payments_refund_views import RefundPaymentView
 from .views.payments_fail_views import FailPaymentsView
 from .webhooks.views.stripe_webhook_views import StripeWebhookView
 
 urlpatterns = [
     path('intent/', CreatePaymentIntentView.as_view(), name='intent_payment'),
+    path('payment-history/', PaymentHistoryView.as_view(), name='payment-history'),
+    path('transaction-history/', TransactionHistoryView.as_view(), name='transaction-history'),
+    path('billing-history/', BillingHistoryView.as_view(), name='billing-history'),
     path('capture/', CapturePaymentView.as_view(), name='capture_payment'),
     path('release/', ReleasePaymentView.as_view(), name='release_payment'),
     path('refund/', RefundPaymentView.as_view(), name='refund_payment'),

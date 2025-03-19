@@ -1,6 +1,5 @@
 from rest_framework_simplejwt.tokens import RefreshToken
 
-
 class TokenService:
     @staticmethod
     def generate_jwt_token(user):
@@ -10,3 +9,4 @@ class TokenService:
             "refresh": str(refresh),
             "access": str(refresh.access_token),
         }
+

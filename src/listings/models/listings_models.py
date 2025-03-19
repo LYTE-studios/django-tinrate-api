@@ -37,3 +37,6 @@ class Listing(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.role.name} - {self.company.name})"
+    
+    class Meta:
+        db_table = 'listings'

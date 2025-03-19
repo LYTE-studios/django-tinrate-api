@@ -63,7 +63,6 @@ class RegisterViewTest(APITestCase):
             username="newuser", email="newuser@example.com", password="password123"
         )
         response = self.client.post(self.register_url, self.valid_payload, format="json")
-        print(response.content)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
