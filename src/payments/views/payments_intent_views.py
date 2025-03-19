@@ -32,31 +32,30 @@ class CreatePaymentIntentView(APIView):
         Returns:
             - JSON response containing PaymentIntent details.
         """
-
         serializer = PaymentSerializer(data=request.data, context={"request": request})
-        if serializer.is_valid():
-            payment = serializer.save()  # Create the Payment instance
-            return Response(PaymentSerializer(payment).data, status=status.HTTP_201_CREATED)  # Return serialized data with 'id'
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Extract validated data
+        payment = serializer.save()
         amount = serializer.validated_data["amount"]
-        expert_id = serializer.validated_data["expert_id"] #user acting as expert
+        expert_id = serializer.validated_data["expert_id"]
 
         if not amount or not expert_id:
             return Response({"error": "Amount and expert_id are required"}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         try:
             expert = User.objects.get(id=expert_id)
         except User.DoesNotExist:
             return Response({"error": "Expert not found"}, status=status.HTTP_404_NOT_FOUND)
-        
+
         try:
-            #Create a PaymentIntent (Authorization only)
+            # Create a PaymentIntent (Authorization only)
             intent = stripe.PaymentIntent.create(
                 amount=int(float(amount) * 100),
                 currency="eur",
                 payment_method_types=["card"],
-                capture_method="manual", #holds the payment, do not capture yet
+                capture_method="manual",  # Holds the payment, do not capture yet
                 metadata={"expert_id": expert_id}
             )
         except stripe.error.CardError as e:
@@ -70,13 +69,13 @@ class CreatePaymentIntentView(APIView):
         except stripe.error.StripeError as e:
             return Response({"error": "Stripe API error: " + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
-            return Response({"error": "An unexpected error occurred" + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-            
+            return Response({"error": "An unexpected error occurred: " + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         try:
-            #store the payment in the database
+            # Store the payment in the database
             intent_id = intent.get("id") if isinstance(intent, dict) else intent.id
             client_secret = intent.get("client_secret") if isinstance(intent, dict) else intent.client_secret
+
             Payment.objects.create(
                 customer=request.user,
                 expert=expert,
@@ -84,9 +83,9 @@ class CreatePaymentIntentView(APIView):
                 amount=amount,
                 status="authorized"
             )
-            print("Intent response:", intent)
+
+            # Return the PaymentIntent details
+            return Response({"payment_intent": intent_id, "client_secret": client_secret}, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            return Response({"error": "Error saving payment information" + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        return Response({"payment_intent": intent_id, "client_secret": client_secret})
+            return Response({"error": "Error saving payment information: " + str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
