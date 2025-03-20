@@ -16,7 +16,7 @@ class UserSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'allow_cancellation_fee']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name']
 
     def validate_username(self, value):
         """Validates that the username is unique and not already taken."""
