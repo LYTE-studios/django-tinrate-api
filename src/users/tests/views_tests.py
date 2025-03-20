@@ -17,7 +17,6 @@ class UserViewTest(APITestCase):
             password='password123',
             first_name='Test',
             last_name='User',
-            allow_cancellation_fee=False
         )
         self.url = reverse('user_view')
 
@@ -38,10 +37,52 @@ class UserViewTest(APITestCase):
     def test_update_user_success(self):
         """Test successful user update."""
         self.client.force_authenticate(user=self.user)
-        updated_date = {
+        updated_data = {
             'first_name': 'Updated',
             'last_name': 'Name',
-            'allow_cancellation_fee': True,
         }
 
-       
+        response = self.client.put(
+           self.url,
+           data=json.dumps(updated_data),
+           content_type='application/json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'Updated')
+        self.assertEqual(self.user.last_name, 'Name')
+
+    def test_update_user_invalid_data(self):
+        """Test user update with invalid data."""
+        self.client.force_authenticate(user=self.user)
+        invalid_data={'first_name':'',}
+        response = self.client.put(
+           self.url,
+           data=json.dumps(invalid_data),
+           content_type='application/json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_update_username_already_exists(self):
+        """Test that updating username to existing one fails."""
+        User.objects.create_user(
+            username='existinguser',
+            email='existing@example.com',
+            password='password123',
+        )
+        self.client.force_authenticate(user=self.user)
+        data = {'username':'existinguser',}
+        response = self.client.put(
+           self.url,
+           data=json.dumps(data),
+           content_type='application/json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('username', response.data)
+
+    def test_delete_user(self):
+        """Test deleting a user."""
+        self.client.force_authenticate(user=self.user)
+        response = self.client.delete(self.url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(User.objects.filter(username='testuser').exists())
