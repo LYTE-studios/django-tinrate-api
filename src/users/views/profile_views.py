@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django.db.models import Avg
 from django.contrib.auth import get_user_model
@@ -261,6 +262,7 @@ class ExperienceViewSet(viewsets.ModelViewSet):
 
     The Experience model is associated with a user profile, and only the owner of the profile can manage their experiences.
     """
+    serializer_class = ExperienceSerializer
     
     def get_queryset(self):
         """
@@ -286,10 +288,8 @@ class ExperienceViewSet(viewsets.ModelViewSet):
             profile = self.request.user.user_profile
             serializer.save(user_profile=profile)
         except UserProfile.DoesNotExist:
-            return Response(
-                {"detail": "You must create a profile before adding experiences."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            raise ValidationError(
+                {"detail": "You must create a profile before adding experiences."})
     
     def update(self, request, *args, **kwargs):
         """

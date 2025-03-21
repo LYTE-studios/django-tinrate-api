@@ -105,7 +105,6 @@ class UserViewTest(APITestCase):
         self.assertFalse(User.objects.filter(username='testuser').exists())
 
 
-
 class UserProfileViewSetTests(APITestCase):
     def setUp(self):
         self.client = APIClient()
@@ -266,6 +265,47 @@ class UserProfileViewSetTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
 
+class ExperienceViewSetTest(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.user_profile = UserProfile.objects.create(user=self.user, country='USA', job_title='Developer')
+        self.experience_data = {
+            'name': 'WebDesign',
+            'weight': 1,
+        }
+        self.url = reverse('user_experiences-list')
+        self.client.force_authenticate(self.user)
+
+    def test_create_experience(self):
+        """Test creating an experience for an authenticated user."""
+        self.client.force_authenticate(self.user)
+        response = self.client.post(self.url, self.experience_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Experience.objects.count(), 1)
+        self.assertEqual(Experience.objects.first().user_profile, self.user_profile)
+
+    def test_create_experience_without_profile(self):
+        """Test creating an experience when the user does not have a profile."""
+        user_without_profile = User.objects.create_user(
+            username='userwitout',
+            email='userwitout@example.com',
+            password='password123',
+            first_name='User',
+            last_name='Without',
+        )
+        self.client.force_authenticate(user_without_profile)
+        response = self.client.post(self.url, self.experience_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('detail', response.data)
+        self.assertEqual(response.data['detail'], "You must create a profile before adding experiences.")
+        
 
 
 
