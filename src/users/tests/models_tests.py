@@ -11,6 +11,13 @@ from users.models.profile_models import (
     Review
 )
 
+from users.models.settings_models import (
+    Settings,
+    NotificationPreferences,
+    PaymentSettings,
+    SupportTicket
+)
+
 class UserModelTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -181,3 +188,114 @@ class ReviewModelTest(TestCase):
     def test_review_str(self):
         """Test if the string representation of the review is correct."""
         self.assertEqual(str(self.review), 'Review by reviewer for testuser')
+
+
+class SettingsModelTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='testuser',
+            email='testuser@example.com',
+            password='password123'
+        )
+
+    def test_settings_creation(self):
+        """Test if the settings instance is created succcesfully."""
+        settings = Settings.objects.create(user=self.user)
+        self.assertEqual(settings.user.username, 'testuser')
+
+    def test_settings_update(self):
+        settings = Settings.objects.create(user=self.user)
+        settings.profile = {'theme':'dark'}
+        settings.save()
+        updated_settings = Settings.objects.get(user=self.user)
+        self.assertEqual(updated_settings.profile, {'theme':'dark'})
+
+    def test_settings_str(self):
+        """Test if the string representtion of the settings is correct."""
+        settings = Settings.objects.create(user=self.user)
+        self.assertEqual(str(settings), 'Settings for testuser')
+        
+
+class NotificationPreferencesModelTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='testuser',
+            email='testuser@example.com',
+            password='password123'
+        )
+        self.notification_preferences = NotificationPreferences.objects.create(user=self.user)
+
+    def test_notification_preferences_creation(self):
+        """Test if the notification preferences instance is created successfully."""
+        self.assertEqual(self.notification_preferences.user.username, 'testuser')
+        self.assertTrue(self.notification_preferences.booking_notifications)
+
+    def test_notification_preferences_update(self):
+        """Test updating notification preferences for a user."""
+        self.notification_preferences.booking_notifications = False
+        self.notification_preferences.save()
+        updated_preferences = NotificationPreferences.objects.get(user=self.user)
+        self.assertFalse(updated_preferences.booking_notifications)
+
+    def test_notification_preferences_str(self):
+        """Test if the string representation of the notification preferences is correct."""
+        self.assertEqual(str(self.notification_preferences), "Notification preferences for testuser")
+
+
+
+class PaymentSettingsModelTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='testuser',
+            email='testuser@example.com',
+            password='password123'
+        )
+        self.payment_settings = PaymentSettings.objects.create(user=self.user)
+
+    def test_payment_settings_creation(self):
+        """Test if the payment settings instance is created successfully."""
+        self.assertEqual(self.payment_settings.user.username, 'testuser')
+        self.assertEqual(self.payment_settings.payment_method, 'bank_transfer')
+
+    def test_payment_settings_update(self):
+        """Test updating payment settings for a user."""
+        self.payment_settings.payment_method = 'paypal'
+        self.payment_settings.save()
+        updated_payment_settings = PaymentSettings.objects.get(user=self.user)
+        self.assertEqual(updated_payment_settings.payment_method, 'paypal')
+
+    def test_payment_settings_str(self):
+        """Test if the string representation of payment settings is correct."""
+        self.assertEqual(str(self.payment_settings), "Payment settings for testuser")
+
+
+class SupportTicketModelTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='testuser',
+            email='testuser@example.com',
+            password='password123'
+        )
+        self.support_ticket= SupportTicket.objects.create(
+            user=self.user,
+            issue_type = 'account',
+            description = 'Test account issue'
+            )
+
+    def test_support_ticket_creation(self):
+        """Test if the support ticket instance is created successfully."""
+        self.assertEqual(self.support_ticket.user.username, 'testuser')
+        self.assertEqual(self.support_ticket.issue_type, 'account')
+
+    def test_support_ticket_resolution(self):
+        """Test resolving a support ticket"""
+        self.support_ticket.resolved = True
+        self.support_ticket.resolution_notes = 'Issue resolved'
+        self.support_ticket.save()
+        updated_ticket = SupportTicket.objects.get(user=self.user)
+        self.assertTrue(updated_ticket.resolved)
+        self.assertEqual(updated_ticket.resolution_notes, 'Issue resolved')
+
+    def test_support_ticket_str(self):
+        """Test if the string representation of support ticket is correct."""
+        self.assertEqual(str(self.support_ticket), 'Support ticket (account) for testuser')
