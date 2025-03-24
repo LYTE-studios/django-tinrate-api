@@ -111,7 +111,7 @@ class PasswordSettingsViewSet(viewsets.GenericViewSet):
         """
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            request.user.set_password(serializer.validated_data['new_password'])
+            request.user.set_password(serializer.validated_data['new_password1'])
             request.user.save()
             return Response({"detail":"Password updated successfully."},
                             status=status.HTTP_200_OK)

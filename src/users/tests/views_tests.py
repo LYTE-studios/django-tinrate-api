@@ -774,3 +774,53 @@ class ProfileSettingsViewSetTest(APITestCase):
         response = self.client.put(self.url_update, invalid_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('first_name', response.data)
+
+
+class PasswordSettingsViewSetTest(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.user_profile = UserProfile.objects.create(user=self.user, country='USA', job_title='Developer') 
+        self.client.force_authenticate(self.user)
+        self.url = reverse('password_settings-change-password')
+        self.client.force_authenticate(self.user)
+
+    def test_change_password_success(self):
+        """Test changing the password with valid input."""
+        data = {
+        'old_password': 'password123', 
+        'new_password1': 'newsecurepassword',
+        'new_password2': 'newsecurepassword'
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['detail'], "Password updated successfully.")
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('newsecurepassword'))
+
+    def test_change_password_invalid(self):
+        """Test changing the password with invalid input."""
+        data = {
+        'old_password': 'password123', 
+        'new_password1': '',
+        'new_password2': ''
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('new_password1', response.data)
+
+    def test_change_password_unauthenticated(self):
+        """Test changing the password while unauthenticated."""
+        self.client.logout()
+        data = {
+        'old_password': 'password123', 
+        'new_password1': 'newsecurepassword',
+        'new_password2': 'newsecurepassword'
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
