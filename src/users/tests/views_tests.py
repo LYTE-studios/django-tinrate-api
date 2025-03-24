@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from io import BytesIO
 from PIL import Image
 import json
+from users.models.settings_models import NotificationPreferences
 from users.views.profile_views import (
     UserProfileViewSet,
     ExperienceViewSet,
@@ -823,4 +824,70 @@ class PasswordSettingsViewSetTest(APITestCase):
         'new_password2': 'newsecurepassword'
         }
         response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class NotificationPreferencesViewSetTest(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.user_profile = UserProfile.objects.create(user=self.user, country='USA', job_title='Developer') 
+        self.client.force_authenticate(self.user)
+        self.url_retrieve = reverse('notification_preferences-retrieve-preferences')
+        self.url_update = reverse('notification_preferences-update-preferences')
+        self.client.force_authenticate(self.user)
+        self.preferences = NotificationPreferences.objects.create(
+            user=self.user,
+            booking_notifications=True,
+            payments_notifications=True,
+            meeting_reminders=True,
+            updates_promotions=False,
+            preferred_method='email',
+        )
+
+    def test_retrieve_notification_preferences(self):
+        """Test retrieving the notification preferences of an authenticated user."""
+        response = self.client.get(self.url_retrieve)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('booking_notifications', response.data)
+        self.assertEqual(response.data['updates_promotions'], False)
+
+    def test_update_notification_preferences(self):
+        """Test updating the notification preferences with valid data."""
+        data = {
+            'preferred_method':'sms',
+            'booking_notifications':False
+        }
+        response = self.client.put(self.url_update, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.preferences.refresh_from_db()
+        self.assertFalse(self.preferences.booking_notifications)
+
+    def test_update_notifications_preferences_invalid_data(self):
+        """Test updating notification preferences with invalid data."""
+        data = {
+            'booking_notifications':'invalid_value',
+        }
+        response = self.client.put(self.url_update, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('booking_notifications', response.data)
+
+    def test_retrieve_preferences_unauthenticated(self):
+        """Test retrieving notifications preferences while unauthenticated."""
+        self.client.logout()
+        response = self.client.get(self.url_retrieve)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_update_preferences_unauthenticated(self):
+        """Test updating notification preferences while unauthenticated."""
+        self.client.logout()
+        data = {
+            'meeting_reminders':False,
+        }
+        response = self.client.put(self.url_update, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
