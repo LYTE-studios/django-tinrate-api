@@ -723,3 +723,54 @@ class ReviewViewSetTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['comment'], 'Great profile!')
+    
+
+class ProfileSettingsViewSetTest(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.user_profile = UserProfile.objects.create(user=self.user, country='USA', job_title='Developer') 
+        self.client.force_authenticate(self.user)
+        self.url_retrieve = reverse('profile_settings-retrieve-profile')
+        self.url_update = reverse('profile_settings-update-profile')
+
+    def test_retrieve_profile(self):
+        """Test retrieving the profile settings of the authenticated user."""
+        response = self.client.get(self.url_retrieve)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['first_name'], 'Test')
+        self.assertEqual(response.data['last_name'], 'User')
+
+    def test_update_profile(self):
+        """Test updating the profile settings of the authenticated user."""
+        data = {
+            'first_name':'UpdatedFirstName',
+            'last_name':'UpdatedLastName',
+        }
+        response = self.client.put(self.url_update, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'UpdatedFirstName')
+        self.assertEqual(self.user.last_name, 'UpdatedLastName')
+
+        partial_data = {'first_name':'PartialFirstName'}
+        response = self.client.patch(self.url_update, partial_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'PartialFirstName')
+        self.assertEqual(self.user.last_name, 'UpdatedLastName')
+
+    def test_update_profile_invalid_data(self):
+        """Test updating the profile with invalid data."""
+        invalid_data = {
+            'first_name':'',
+            'last_name':'NewLastName',
+        }
+        response = self.client.put(self.url_update, invalid_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('first_name', response.data)
