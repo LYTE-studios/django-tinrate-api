@@ -6,6 +6,7 @@ from users.models import (
     NotificationPreferences,
     PaymentSettings,
     SupportTicket,
+    Settings
 )
 
 User = get_user_model()
@@ -22,11 +23,11 @@ class ProfileSettingsSerializer(serializers.ModelSerializer):
         update(instance, validated_data):
             Updates the user's profile settings, including handling nested user data updates.
     """
-    first_name = serializers.CharField(source='user.fist_name')
+    first_name = serializers.CharField(source='user.first_name')
     last_name = serializers.CharField(source='user.last_name')
 
     class Meta:
-        model: UserProfile
+        model = UserProfile
         fields = ['profile_picture', 'first_name', 'last_name', 'description']
 
     def update(self, instance, validated_data):
@@ -136,10 +137,10 @@ class NotificationPreferencesSerializer(serializers.ModelSerializer):
         validate_preferred_method(value): Ensures the chosen notification method is valid.
     """
     class Meta:
-        model: NotificationPreferences
+        model = NotificationPreferences
         fields = [
             'booking_notifications',
-            'payment_notifications',
+            'payments_notifications',
             'meeting_reminders',
             'updates_promotions',
             'preferred_method',
@@ -173,7 +174,7 @@ class PaymentSettingsSerializer(serializers.ModelSerializer):
         validate(data): Ensures required fields are provided based on the chosen payment method.
     """
     class Meta:
-        model: PaymentSettings
+        model = PaymentSettings
         fields = [
             'payment_method',
             'allow_cancellation_fee',
@@ -254,4 +255,12 @@ class SupportTicketSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(f"Issue type must be one of: {valid_choices}")
         return value
 
-        
+class SettingsSerializer(serializers.ModelSerializer):
+    """
+    Serializer for the Settings model.
+    """
+    class Meta:
+        model = Settings
+        fields = ['profile', 'account_security', 'notification_pref', 
+                  'payment_settings', 'support_help']
+        read_only_fields = ['id', 'user']
