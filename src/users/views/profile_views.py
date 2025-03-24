@@ -1,3 +1,4 @@
+from gc import get_objects
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -557,6 +558,17 @@ class ReviewViewSet(viewsets.ModelViewSet):
         """
         return Review.objects.filter(reviewer=self.request.user)
     
+    def get_object(self):
+        """
+        Ensures that users can only retrieve or modify their own reviews.
+        
+        Raises:
+            - 403 Forbidden if the user does not own the review.
+        """
+        obj = get_object_or_404(Review, id=self.kwargs['pk'])
+        if obj.reviewer != self.request.user:
+            raise PermissionDenied('You do not have permission to access this review.')
+        return obj
     
     def create(self, request, *args, **kwargs):
         """
@@ -626,7 +638,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
         Returns:
             Response: The updated review data or an error message if the user does not have permission.
         """
-        instance = get_user_model()
+        instance = self.get_object()
 
         if instance.reviewer != request.user:
             return Response(
@@ -652,7 +664,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
         Returns:
             Response: An empty response with status 204 (No Content) if successful, or an error message if the user does not have permission.
         """
-        instance = get_user_model()
+        instance = self.get_object()
 
         if instance.reviewer != request.user:
             return Response(

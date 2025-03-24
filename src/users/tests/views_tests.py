@@ -601,6 +601,14 @@ class ReviewViewSetTest(APITestCase):
             last_name='User',
         )
         self.user_profile2 = UserProfile.objects.create(user=self.user2, country='USA', job_title='Developer')
+        self.user3 = User.objects.create_user(
+            username='testuser3',
+            email='test3@example.com',
+            password='password123',
+            first_name='Test3',
+            last_name='User',
+        )
+        self.user_profile3 = UserProfile.objects.create(user=self.user3, country='USA', job_title='Developer')
         self.review = Review.objects.create(
             user_profile=self.user_profile2,
             reviewer=self.user1,
@@ -643,3 +651,75 @@ class ReviewViewSetTest(APITestCase):
         response = self.client.post(self.url, data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data['detail'], "You have already reviewed this user.")
+
+    def test_create_review_success(self):
+        """Test creating a new valid review for a different user profile."""
+        data = {
+            'user_profile': self.user_profile3.id,
+            'reviewer':self.user1.id,
+            'comment':'Nice!',
+            'rating':4
+        }
+        response = self.client.post(self.url, data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['comment'], 'Nice!')
+
+    def test_update_review_permissions(self):
+        """Test updating a review where the user is not the reviewer should return forbidden."""
+        review_data = {
+            'user_profile': self.user_profile3.id,
+            'reviewer': self.user1.id, 
+            'comment': 'Great!',
+            'rating': 4
+        }
+        review_response = self.client.post(self.url, review_data)
+        self.assertEqual(review_response.status_code, status.HTTP_201_CREATED)
+        review_id = review_response.data['id']
+        self.client.force_authenticate(self.user2)
+        data = {
+            'user_profile': self.user_profile3.id,
+            'reviewer':self.user2.id,
+            'comment':'Updated comment!',
+            'rating':4
+        }
+        response = self.client.put(f"{self.url}{review_id}/", data)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data['detail'], 'You do not have permission to access this review.')
+
+    def test_update_review_success(self):
+        """Test updating a review that the user has written."""
+        data = {
+            'user_profile': self.user_profile2.id,
+            'reviewer':self.user1.id,
+            'comment':'Updated comment!',
+            'rating':4
+        }
+        response = self.client.put(f"{self.url}{self.review.id}/", data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['comment'], 'Updated comment!')
+
+    def test_delete_review_permissions(self):
+        """Test deleting a review where the user is not the reviewer should return forbidden."""
+        self.client.force_authenticate(self.user2)
+        response = self.client.delete(f"{self.url}{self.review.id}/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data['detail'], "You do not have permission to access this review." )
+
+
+    def test_delete_review_success(self):
+        """Test deleting a reivew that the user has written."""
+        response = self.client.delete(f"{self.url}{self.review.id}/")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_get_reviews(self):
+        """Test that the user can only retrieve their own reviews."""
+        Review.objects.create(
+            user_profile=self.user_profile3,
+            reviewer=self.user2,
+            comment='Great profile!',
+            rating=5,
+        )
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['comment'], 'Great profile!')
