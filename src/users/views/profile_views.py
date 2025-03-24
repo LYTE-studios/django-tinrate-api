@@ -355,7 +355,7 @@ class CareerViewSet(viewsets.ModelViewSet):
 
     The Career model is associated with a user profile, and only the owner of the profile can manage their careers.
     """
-    
+    serializer_class = CareerSerializer
     def get_queryset(self):
         """
         Returns the list of careers for the authenticated user.
@@ -367,6 +367,18 @@ class CareerViewSet(viewsets.ModelViewSet):
         """
         return Career.objects.filter(user_profile__user=self.request.user)
     
+    def get_object(self):
+        """
+        Ensures that users can only retrieve or modify their own careers.
+        
+        Raises:
+            - 403 Forbidden if the user does not own the career.
+        """
+        obj = get_object_or_404(Career, id=self.kwargs['pk'])
+        if obj.user_profile != self.request.user.user_profile:
+            raise PermissionDenied('You do not have permission to access this career.')
+        return obj
+    
     def perform_create(self, serializer):
         """
         Saves a new career, associating it with the user's profile.
@@ -376,14 +388,10 @@ class CareerViewSet(viewsets.ModelViewSet):
         Args:
             serializer (CareerSerializer): The serializer instance used to validate and save the new career.
         """
-        try:
-            profile = self.request.user.user_profile
-            serializer.save(user_profile=profile)
-        except UserProfile.DoesNotExist:
-            return Response(
-                {"detail": "You must create a profile before adding careers."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        if not hasattr(self.request.user, 'user_profile'):
+            raise ValidationError({"detail": "You must create a profile before adding careers."})
+
+        serializer.save(user_profile=self.request.user.user_profile)
     
     def update(self, request, *args, **kwargs):
         """

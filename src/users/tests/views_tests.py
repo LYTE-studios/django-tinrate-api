@@ -365,3 +365,103 @@ class ExperienceViewSetTest(APITestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
+
+
+class CareerViewSetTest(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.user_profile = UserProfile.objects.create(user=self.user, country='USA', job_title='Developer')
+        
+        self.other_user = User.objects.create_user(
+            username='otheruser',
+            email='otherusert@example.com',
+            password='password123',
+            first_name='Other',
+            last_name='User',
+        )
+        self.other_user_profile = UserProfile.objects.create(user=self.other_user, country='USA', job_title='Developer')
+        self.career = Career.objects.create(
+            user_profile = self.user_profile,
+            job_title = 'Developer',
+            company_name = 'TechCorp',
+            job_status = 'full-time',
+            description = 'Developer at TechCorp',
+        )
+        self.url = reverse('user_careers-list')
+        self.client.force_authenticate(self.user)
+
+    def test_list_careers(self):
+        """Test listing careers only for the authenticated user."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1 )
+
+    def test_create_career_with_profile(self):
+        """Test creating a career when the user has a profile."""
+        data = {'job_title':'Developer', 'company_name': 'TechCorp', 'job_status': 'full-time', 'description':'Developer at TechCorp'}
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_create_career_without_profile(self):
+        """Test creating a career when the user does not have a profile."""
+        self.no_profile_user = User.objects.create_user(
+            username='noprofileuser',
+            email='noprofileuser@example.com',
+            password='password123',
+            first_name='Noprofile',
+            last_name='User',
+        )
+        self.client.force_authenticate(self.no_profile_user)
+        data = {'job_title':'Developer', 'company_name': 'TechCorp', 'job_status': 'full-time', 'description':'Developer at TechCorp'}
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("You must create a profile before adding careers.", str(response.data))
+
+    def test_retrieve_career_owner(self):
+        """Test retrieving a career as the owner."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_retrieve_career_not_owner(self):
+        """Test retrieving a career as a non-owner should fail."""
+        self.client.force_authenticate(self.other_user)
+        response = self.client.get(f"{self.url}{self.career.id}/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("You do not have permission to access this career.", response.data['detail'])
+    
+    def test_update_career_owner(self):
+        """Test updating a career as the owner."""
+        data = {'job_title':'Designer',  'company_name': 'TechCorp', 'job_status': 'full-time', 'description':'Developer at TechCorp'}
+        response = self.client.put(f"{self.url}{self.career.id}/", data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.career.refresh_from_db()
+        self.assertEqual(self.career.job_title, 'Designer')
+
+    def test_update_career_not_owner(self):
+        """Test updating a career as a non-owner should fail."""
+        self.client.force_authenticate(self.other_user)
+        data = {'job_title':'Designer',  'company_name': 'TechCorp', 'job_status': 'full-time', 'description':'Developer at TechCorp'}
+        response = self.client.put(f"{self.url}{self.career.id}/", data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_delete_career_owner(self):
+        """Test deleting a career as the owner."""
+        response = self.client.delete(f"{self.url}{self.career.id}/")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Career.objects.filter(id=self.career.id).exists())
+
+    def test_delete_career_not_owner(self):
+        """Test deleting a career as a non-owner should fail."""
+        self.client.force_authenticate(self.other_user)
+        response = self.client.delete(f"{self.url}{self.career.id}/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    
+
