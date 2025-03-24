@@ -580,3 +580,66 @@ class EducationViewSetTest(APITestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
+
+
+class ReviewViewSetTest(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user1 = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.user_profile1 = UserProfile.objects.create(user=self.user1, country='USA', job_title='Developer') 
+        self.user2 = User.objects.create_user(
+            username='testuser2',
+            email='test2@example.com',
+            password='password123',
+            first_name='Test2',
+            last_name='User',
+        )
+        self.user_profile2 = UserProfile.objects.create(user=self.user2, country='USA', job_title='Developer')
+        self.review = Review.objects.create(
+            user_profile=self.user_profile2,
+            reviewer=self.user1,
+            comment='Great profile!',
+            rating=5,
+        )
+        self.client.force_authenticate(self.user1)
+        self.url = reverse('user_reviews-list')
+
+    def test_create_review_for_own_profile(self):
+        """Test creating a review for the user's own profile should return a bad request."""
+        data = {
+            'user_profile':self.user_profile1.id,
+            'comment':'Nice!',
+            'rating':4
+        }
+        response = self.client.post(self.url, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['detail'], "You cannot review your own profile.")
+
+    def test_create_review_when_profile_not_found(self):
+        """Test creating a review for a non-existent profile should return not found."""
+        data = {
+            'user_profile': 123456,
+            'comment':'Nice!',
+            'rating':4
+        }
+        response = self.client.post(self.url, data)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data['detail'], "User profile not found.")
+
+    def test_create_review_when_already_reviewed(self):
+        """Test creating a duplicate review for the same profile should return a bad request."""
+        data = {
+            'user_profile': self.user_profile2.id,
+            'reviewer':self.user1.id,
+            'comment':'Nice!',
+            'rating':4
+        }
+        response = self.client.post(self.url, data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['detail'], "You have already reviewed this user.")
