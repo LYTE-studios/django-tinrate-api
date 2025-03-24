@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from io import BytesIO
 from PIL import Image
 import json
-from users.models.settings_models import NotificationPreferences
+from users.models.settings_models import NotificationPreferences, PaymentSettings
 from users.views.profile_views import (
     UserProfileViewSet,
     ExperienceViewSet,
@@ -888,6 +888,78 @@ class NotificationPreferencesViewSetTest(APITestCase):
         self.client.logout()
         data = {
             'meeting_reminders':False,
+        }
+        response = self.client.put(self.url_update, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+class PaymentSettingsViewSetTest(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.user_profile = UserProfile.objects.create(user=self.user, country='USA', job_title='Developer') 
+        self.client.force_authenticate(self.user)
+        self.url_retrieve = reverse('payment_settings-retrieve-settings')
+        self.url_update = reverse('payment_settings-update-settings')
+        self.client.force_authenticate(self.user)
+        self.payment_settings = PaymentSettings.objects.create(
+            user=self.user,
+            payment_method='paypal',
+            allow_cancellation_fee=False,
+            paypal_email='paypal@example.com',
+        )
+    def test_retrieve_payment_settings(self):
+        """Test retrieving the payment settings of an authenticated user."""
+        response = self.client.get(self.url_retrieve)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['allow_cancellation_fee'], False)
+
+    def test_update_payment_settings(self):
+        """Test updating the payment settings of an authenticated user."""
+        data = {
+            'payment_method': 'crypto',
+            'crypto_wallet_address':'crypto@example.com',
+            'allow_cancellation_fee': True
+        }
+        response = self.client.put(self.url_update, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.payment_settings.refresh_from_db()
+        self.assertTrue(self.payment_settings.allow_cancellation_fee)
+
+    def test_partial_update_payment_settings(self):
+        """Test partially updating the payment settings."""
+        data = {
+            'allow_cancellation_fee': True
+        }
+        response = self.client.patch(self.url_update, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.payment_settings.refresh_from_db()
+        self.assertTrue(self.payment_settings.allow_cancellation_fee)
+
+    def test_update_payment_settings_invalid_data(self):
+        """Test updating the payment settings with invalid data."""
+        data = {
+            'payment_method':'invalid_value'
+        }
+        response = self.client.put(self.url_update, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('payment_method', response.data)
+
+    def test_retrieve_payment_settings_unauthenticated(self):
+        """Test retrieving payment settings while unauthenticated."""
+        self.client.logout()
+        response = self.client.get(self.url_retrieve)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_update_payment_settings_unauthenticated(self):
+        """Test updating payment settings while unauthenticated."""
+        self.client.logout()
+        data = {
+            'allow_cancellation_fee': True
         }
         response = self.client.put(self.url_update, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
