@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, PermissionDenied
 from django.shortcuts import get_object_or_404
 from django.db.models import Avg
 from django.contrib.auth import get_user_model
@@ -275,6 +275,18 @@ class ExperienceViewSet(viewsets.ModelViewSet):
         """
         return Experience.objects.filter(user_profile__user=self.request.user)
     
+    def get_object(self):
+        """
+        Ensures that users can only retrieve or modify their own experiences.
+        
+        Raises:
+            - 403 Forbidden if the user does not own the experience.
+        """
+        obj = get_object_or_404(Experience, id=self.kwargs['pk'])
+        if obj.user_profile != self.request.user.user_profile:
+            raise PermissionDenied('You do not have permission to access this experience.')
+        return obj
+    
     def perform_create(self, serializer):
         """
         Saves a new experience, associating it with the user's profile.
@@ -305,12 +317,7 @@ class ExperienceViewSet(viewsets.ModelViewSet):
         Returns:
             Response: The updated experience data, or an error message if permissions are not met.
         """
-        instance = self.get_object()
-        if instance.user_profile.user != request.user:
-            return Response(
-                {"detail": "You do not have permissions to update this experience."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        
         return super().update(request, *args, **kwargs)
     
     def delete(self, request, *args, **kwargs):

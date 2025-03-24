@@ -1,3 +1,4 @@
+from urllib import response
 from django.test import TestCase
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -305,9 +306,62 @@ class ExperienceViewSetTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('detail', response.data)
         self.assertEqual(response.data['detail'], "You must create a profile before adding experiences.")
-        
 
+    def test_update_experience(self):
+        """Test updating an experience by the owner. Ensures that only the owner can update it."""
+        experience = Experience.objects.create(user_profile=self.user_profile, **self.experience_data)
+        updated_data = {'name': 'WebDev','weight': 2,}
+        self.client.force_authenticate(self.user)
+        response = self.client.put(f"{self.url}{experience.id}/", updated_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        experience.refresh_from_db()
+        self.assertEqual(experience.name, 'WebDev')
 
+    def test_update_experience_without_experience(self):
+        """Test updating an expeirence by a user who does not own the experience."""
+        experience = Experience.objects.create(user_profile=self.user_profile, **self.experience_data)
+        other_user = User.objects.create_user(
+            username='otheruser',
+            email='otheruser@example.com',
+            password='password123',
+            first_name='Other',
+            last_name='User',
+        )
+        other_user_profile = UserProfile.objects.create(user=other_user)
+        self.client.force_authenticate(other_user)
+        updated_data = {'name': 'WebDev','weight': 2,}
+        response = self.client.put(f"{self.url}{experience.id}/", updated_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("You do not have permission to access this experience.", response.data['detail'])
 
+    def test_delete_experience(self):
+        """Test deleting an experience by the owner."""
+        experience = Experience.objects.create(user_profile=self.user_profile, **self.experience_data)
+        self.client.force_authenticate(self.user)
+        response = self.client.delete(f"{self.url}{experience.id}/")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(Experience.objects.count(), 0)
 
+    def test_delete_experience_without_permission(self):
+        """"Test deleting an experience by a user who does not own the experience."""
+        experience = Experience.objects.create(user_profile=self.user_profile, **self.experience_data)
+        other_user = User.objects.create_user(
+            username='otheruser',
+            email='otheruser@example.com',
+            password='password123',
+            first_name='Other',
+            last_name='User',
+        )
+        other_user_profile = UserProfile.objects.create(user=other_user)
+        self.client.force_authenticate(other_user)
+        response = self.client.delete(f"{self.url}{experience.id}/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("You do not have permission to access this experience.", str(response.data['detail']))
 
+    def test_list_experiences(self):
+        """Test listing experiences for the authenticated user."""
+        Experience.objects.create(user_profile=self.user_profile, **self.experience_data)
+        self.client.force_authenticate(self.user)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
