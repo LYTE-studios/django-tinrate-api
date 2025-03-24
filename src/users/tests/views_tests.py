@@ -463,5 +463,120 @@ class CareerViewSetTest(APITestCase):
         response = self.client.delete(f"{self.url}{self.career.id}/")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    
 
+class EducationViewSetTest(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.user_profile = UserProfile.objects.create(user=self.user, country='USA', job_title='Developer')
+        self.user_no_profile = User.objects.create_user(
+            username='noprofileuser',
+            email='noprofileuser@example.com',
+            password='password123',
+            first_name='Noprofile',
+            last_name='User',
+        )
+        self.client.force_authenticate(user=self.user)
+        self.education_data = {
+            'user_profile': self.user_profile.id,
+            'school_name': 'School',
+            'diploma': 'Diploma',
+            'description': 'Diploma at School',
+        }
+        self.url = reverse('user_educations-list')
+
+    def test_create_education_without_profile(self):
+        """Test creating an education when the user does not have a profile."""
+        self.client.force_authenticate(self.user_no_profile)
+        education_data = {
+            'school_name': 'School',
+            'diploma': 'Diploma',
+            'description': 'Diploma at School',
+        }
+        response = self.client.post(self.url, education_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("You must create a profile before adding educations.", response.data['detail'])
+
+    def test_create_education_with_profile(self):
+        """Test creating an education when the user has a profile."""
+        response = self.client.post(self.url, self.education_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['school_name'], self.education_data['school_name'])
+        self.assertEqual(response.data['diploma'], self.education_data['diploma'])
+
+    def test_update_education_owner(self):
+        """Test updating an education as the owner."""
+        education_data_without_profile = {**self.education_data}
+        education_data_without_profile.pop('user_profile', None)
+        education = Education.objects.create(user_profile=self.user_profile, **education_data_without_profile)
+        updated_data = {
+            'school_name': 'University',
+            'diploma': 'Diploma',
+            'description': 'Diploma at University',
+        }
+        response = self.client.put(f"{self.url}{education.id}/", updated_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        education.refresh_from_db()
+        self.assertEqual(response.data['school_name'], updated_data['school_name'])
+
+    def test_update_education_unauthorized(self):
+        """Test updating an education not owned by the user."""
+        other_user = User.objects.create_user(
+            username='otheruser',
+            email='otheruser@example.com',
+            password='password123',
+            first_name='Other',
+            last_name='User',
+        )
+        profile_other_user = UserProfile.objects.create(user=other_user, country='USA', job_title='Developer')
+        education_data_without_profile = {**self.education_data}
+        education_data_without_profile.pop('user_profile', None)
+        education = Education.objects.create(user_profile=profile_other_user, **education_data_without_profile)
+        updated_data = {
+            'school_name': 'University',
+            'diploma': 'Diploma',
+            'description': 'Diploma at University',
+        }
+        response = self.client.put(f"{self.url}{education.id}/", updated_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("You do not have permission to access this education.", response.data['detail'])
+
+    def test_delete_education_owner(self):
+        """Test deleting an education owned by the user."""
+        education_data_without_profile = {**self.education_data}
+        education_data_without_profile.pop('user_profile', None)
+        education = Education.objects.create(user_profile=self.user_profile, **education_data_without_profile)
+        response = self.client.delete(f"{self.url}{education.id}/")
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_delete_education_unauthorized(self):
+        """Test deleting an education not owned by the user."""
+        other_user = User.objects.create_user(
+            username='otheruser',
+            email='otheruser@example.com',
+            password='password123',
+            first_name='Other',
+            last_name='User',
+        )
+        profile_other_user = UserProfile.objects.create(user=other_user, country='USA', job_title='Developer')
+        education_data_without_profile = {**self.education_data}
+        education_data_without_profile.pop('user_profile', None)
+        education = Education.objects.create(user_profile=profile_other_user, **education_data_without_profile)
+        response = self.client.delete(f"{self.url}{education.id}/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("You do not have permission to access this education.", response.data['detail'])
+
+    def test_list_educations(self):
+        """Test listing educations for the authenticated user."""
+        education_data_without_profile = {**self.education_data}
+        education_data_without_profile.pop('user_profile', None)
+        education = Education.objects.create(user_profile=self.user_profile, **education_data_without_profile)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)

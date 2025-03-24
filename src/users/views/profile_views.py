@@ -450,7 +450,7 @@ class EducationViewSet(viewsets.ModelViewSet):
 
     The Education model is associated with a user profile, and only the owner of the profile can manage their educations.
     """
-    
+    serializer_class = EducationSerializer
     def get_queryset(self):
         """
         Returns the list of educations for the authenticated user.
@@ -461,6 +461,18 @@ class EducationViewSet(viewsets.ModelViewSet):
             queryset (QuerySet): A queryset containing the user's educations.
         """
         return Education.objects.filter(user_profile__user=self.request.user)
+    
+    def get_object(self):
+        """
+        Ensures that users can only retrieve or modify their own educations.
+        
+        Raises:
+            - 403 Forbidden if the user does not own the education.
+        """
+        obj = get_object_or_404(Education, id=self.kwargs['pk'])
+        if obj.user_profile != self.request.user.user_profile:
+            raise PermissionDenied('You do not have permission to access this education.')
+        return obj
     
     def perform_create(self, serializer):
         """
@@ -475,10 +487,7 @@ class EducationViewSet(viewsets.ModelViewSet):
             profile = self.request.user.user_profile
             serializer.save(user_profile=profile)
         except UserProfile.DoesNotExist:
-            return Response(
-                {"detail": "You must create a profile before adding educations."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            raise ValidationError({"detail": "You must create a profile before adding educations."})
     
     def update(self, request, *args, **kwargs):
         """

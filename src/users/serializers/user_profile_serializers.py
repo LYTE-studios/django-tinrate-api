@@ -5,6 +5,7 @@ from users.serializers.user_serializer import UserSerializer
 from rest_framework.exceptions import ValidationError
 from users.utils.user_profile_utils import calculate_average_rating
 
+
 User = get_user_model()
 
 
@@ -85,10 +86,9 @@ class EducationSerializer(serializers.ModelSerializer):
         - fields: Includes 'id', 'school_name', 'diploma', 'description', 'picture'
         - read_only_fields: 'id'
     """
-
     class Meta:
         model = Education
-        fields = ['id', 'school_name', 'diploma', 'description', 'picture']
+        fields = ['id', 'school_name', 'diploma', 'description', 'picture', 'user_profile']
         read_only_fields = ['id']
 
 
