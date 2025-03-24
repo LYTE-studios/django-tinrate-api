@@ -125,7 +125,7 @@ class SupportTicket(models.Model):
         resolved (bool): Indicates whether the issue has been resolved.
         resolution_notes (str): Optional notes on how the issue was resolved.
     """
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="support_tickets")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="support_tickets")
 
     ISSUE_TYPES = [
         ('account', 'Account Issue'),

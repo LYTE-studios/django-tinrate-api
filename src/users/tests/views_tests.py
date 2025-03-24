@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from io import BytesIO
 from PIL import Image
 import json
-from users.models.settings_models import NotificationPreferences, PaymentSettings
+from users.models.settings_models import NotificationPreferences, PaymentSettings, SupportTicket
 from users.views.profile_views import (
     UserProfileViewSet,
     ExperienceViewSet,
@@ -963,3 +963,105 @@ class PaymentSettingsViewSetTest(APITestCase):
         }
         response = self.client.put(self.url_update, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class SupportTicketViewSetTest(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.other_user = User.objects.create_user(
+            username='otheruser',
+            email='otheruser@example.com',
+            password='password123',
+            first_name='Other',
+            last_name='User',
+        )
+        self.user_profile = UserProfile.objects.create(user=self.user, country='USA', job_title='Developer') 
+        self.other_user_profile = UserProfile.objects.create(user=self.other_user, country='USA', job_title='Developer') 
+        self.client.force_authenticate(self.user)
+        self.ticket1 = SupportTicket.objects.create(
+            user=self.user,
+            issue_type='account',
+            description='Description',
+        )
+        self.ticket2 = SupportTicket.objects.create(
+            user=self.user,
+            issue_type='payment',
+            description='Description',
+            resolved=True
+        )
+        self.ticket3 = SupportTicket.objects.create(
+            user=self.other_user,
+            issue_type='technical',
+            description='Description',
+        )
+        self.url_list = reverse('support_tickets-list')
+        self.url_detail = reverse('support_tickets-detail', kwargs={'pk': 1})
+    
+    def test_list_support_ticket(self):
+        """Test retrieving the list of support tickets for the authenticated user."""
+        response = self.client.get(self.url_list)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]['issue_type'], self.ticket1.issue_type)
+        self.assertEqual(response.data[1]['issue_type'], self.ticket2.issue_type)
+
+    def test_retrieve_support_ticket(self):
+        """Test retrieving a single support ticket owned by the authenticated user."""
+        response = self.client.get(self.url_detail)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['issue_type'], self.ticket1.issue_type)
+        self.assertEqual(response.data['description'], self.ticket1.description)
+
+    def test_retrieve_other_users_ticket(self):
+        """Test that a user cannot retrieve another user's support ticket."""
+        other_ticket_url = reverse('support_tickets-detail', kwargs={'pk': 3})
+        response = self.client.get(other_ticket_url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_create_support_ticket(self):
+        """Test creating a new support ticket."""
+        data = {
+            'user': self.user.id,  
+            'issue_type': 'account',
+            'description': 'Description',
+        }
+        response = self.client.post(self.url_list, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(SupportTicket.objects.count(), 4)
+        self.assertEqual(SupportTicket.objects.latest('id').issue_type, 'account')
+
+    def test_create_support_ticket_invalid_data(self):
+        """Test creating a support ticket with invalid data."""
+        data = {
+            'user': self.user.id,  
+            'issue_type': '',
+            'description': 'Description',
+        }
+        response = self.client.post(self.url_list, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('issue_type', response.data)
+
+    def test_list_tickets_unauthenticated(self):
+        """Test that an unauthenticated user cannot retrieve support tickets."""
+        self.client.logout()
+        response = self.client.get(self.url_list)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_create_ticket_unauthenticated(self):
+        """Test creating a support ticket unauthenticated."""
+        self.client.logout()
+        data = {
+            'user': self.user.id,  
+            'issue_type': '',
+            'description': 'Description',
+        }
+        response = self.client.post(self.url_list, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        

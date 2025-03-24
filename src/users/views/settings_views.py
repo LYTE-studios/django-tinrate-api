@@ -248,7 +248,7 @@ class PaymentSettingsViewSet(viewsets.GenericViewSet):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-class SupportTicketViewSet(viewsets.GenericViewSet):
+class SupportTicketViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing user support tickets.
 
@@ -266,6 +266,7 @@ class SupportTicketViewSet(viewsets.GenericViewSet):
         retrieve(request, pk):
             Retrieves a single support ticket by ID if it belongs to the authenticated user.
     """
+    queryset = SupportTicket.objects.all()
     serializer_class = SupportTicketSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -277,6 +278,7 @@ class SupportTicketViewSet(viewsets.GenericViewSet):
             QuerySet: A queryset containing the support tickets associated with the user.
         """
         return SupportTicket.objects.filter(user=self.request.user)
+
     
     def perform_create(self, serializer) ->None:
         """
