@@ -3,9 +3,11 @@ from rest_framework.exceptions import ValidationError
 from users import serializers
 from users.serializers.user_serializer import UserSerializer
 from users.models.user_models import User
+from users.models.profile_models import UserProfile, Review
 import pycountry
 from PIL import Image
 import io
+from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 from users.serializers.user_profile_serializers import (
     UserProfileCreateUpdateSerializer,
@@ -121,3 +123,63 @@ class UserProfileCreateUpdateSerializerTest(TestCase):
         """Ensure validate_profile_picture rejects images with an invalid format."""
         with self.assertRaises(ValidationError):
             self.serializer.validate_profile_picture(self.invalid_format_image)
+
+
+class UserProfileSerializerTest(TestCase):
+    def setUp(self):
+        self.user1 = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.profile1 = UserProfile.objects.create(
+            user=self.user1,
+            country='USA',
+            job_title='Developer',
+            company_name='TechCorp',
+            total_meetings=5,
+            meetings_completed=4,
+            total_minutes=300,
+            rating='0',
+            description="Experience software engineer specializing in Django."
+        )
+        self.user2 = User.objects.create_user(
+            username='testuser2',
+            email='test2@example.com',
+            password='password123',
+            first_name='Test2',
+            last_name='User',
+        )
+        self.profile2 = UserProfile.objects.create(
+            user=self.user2,
+            country='USA',
+            job_title='Developer',
+            company_name='TechCorp',
+            total_meetings=5,
+            meetings_completed=4,
+            total_minutes=300,
+            rating='0',
+            description="Experience software engineer specializing in Django."
+        )
+        self.serializer = UserProfileSerializer()
+    
+    
+
+    def test_get_average_rating_with_reviews(self):
+        """Test that the average rating is calculated correctly when reviews exist."""
+        review1 = Review.objects.create(
+            user_profile=self.profile2,
+            reviewer=self.user1,
+            comment='Great profile!',
+            rating=5,
+        )
+        review2 = Review.objects.create(
+            user_profile=self.profile2,
+            reviewer=self.user1,
+            comment='Great profile!',
+            rating=4,
+        )
+        serializer = UserProfileSerializer(self.profile2)
+        self.assertEqual(serializer.data['average_rating'], 4.5)
