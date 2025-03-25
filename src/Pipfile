@@ -15,6 +15,7 @@ redis = "*"
 kombu = "*"
 django-extensions = "*"
 pillow = "*"
+pycountry = "*"
 
 [dev-packages]
 

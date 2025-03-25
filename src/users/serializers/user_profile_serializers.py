@@ -4,6 +4,8 @@ from users.models import UserProfile, Experience, Career, Education, Review
 from users.serializers.user_serializer import UserSerializer
 from rest_framework.exceptions import ValidationError
 from users.utils.user_profile_utils import calculate_average_rating
+from django.core.files.images import get_image_dimensions
+import pycountry
 
 
 User = get_user_model()
@@ -205,4 +207,38 @@ class UserProfileCreateUpdateSerializer(serializers.ModelSerializer):
         """
         if len(value) < 2:
             raise serializers.ValidationError("Country name is too short.")
+        
+        valid_countries = [country.name for country in pycountry.countries]
+        if value not in valid_countries:
+            raise serializers.ValidationError("Invalid country name.")
+        
+        return value
+    
+    def validate_profile_picture(self, value):
+        """
+        Validates the uploaded profile picture.
+        
+        Args:
+            value (UploadedFile): The uploaded image file.
+
+        Raises:
+            serializers.ValidationError: If the file is not a valid image, exceeds size limits,
+            or has invalid dimensions.
+
+        Returns:
+            UploadedFile: The validated profile picture.
+        
+        """
+        max_size = 5 * 1024 * 1024
+        allowed_formats = ['image/jpeg',"image/png"]
+
+        if value.size > max_size:
+            raise serializers.ValidationError("Profile picture must be less than 5MB.")
+        if value.content_type not in allowed_formats:
+            raise serializers.ValidationError("Only JPEG and PNG formats are allowed.")
+        
+        width, height = get_image_dimensions(value)
+        if width > 4000 or height > 4000:
+            raise serializers.ValidationError("Image dimensions must not exceed 4000x4000 pixels.")
+        
         return value

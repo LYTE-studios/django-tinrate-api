@@ -3,6 +3,18 @@ from rest_framework.exceptions import ValidationError
 from users import serializers
 from users.serializers.user_serializer import UserSerializer
 from users.models.user_models import User
+import pycountry
+from PIL import Image
+import io
+from django.core.files.uploadedfile import SimpleUploadedFile
+from users.serializers.user_profile_serializers import (
+    UserProfileCreateUpdateSerializer,
+    UserProfileSerializer,
+    ReviewSerializer,
+    EducationSerializer,
+    CareerSerializer,
+    ExperienceSerializer
+)
 
 class UserSerializerTest(TestCase):
     def setUp(self):
@@ -63,3 +75,49 @@ class UserSerializerTest(TestCase):
         response = serializer.delete_user(self.user)
         self.assertEqual(response, {'message':'User account deleted successfully.'})
         self.assertFalse(User.objects.filter(id=self.user.id).exists())
+
+
+class UserProfileCreateUpdateSerializerTest(TestCase):
+    def setUp(self):
+        self.serializer = UserProfileCreateUpdateSerializer()
+        self.valid_image = self.create_test_image("JPEG", (500,500))
+        self.large_image = self.create_test_image("JPEG", (5000,5000))
+        self.invalid_format_image = self.create_test_image("PDF", (600,600))
+        
+    def create_test_image(self, format='JPEG', size=(100,100),color=(255,0,0), file_size=None):
+        """Generates an in-memory image file for testing."""
+        image = Image.new("RGB", size, color)
+        img_io = io.BytesIO()
+        image.save(img_io, format=format)
+        img_io.seek(0)
+        return SimpleUploadedFile(f"test_image.{format.lower()}",
+                                  img_io.getvalue(),
+                                  content_type=f"image/{format.lower()}")
+
+    def test_validate_country_valid(self):
+        """Ensure validate_country accepts a valid country name."""
+        self.assertEqual(self.serializer.validate_country("France"), "France")
+
+    def test_validate_country_too_short(self):
+        """Ensure validate_country raises an error if the country name is too short."""
+        with self.assertRaises(ValidationError):
+            self.serializer.validate_country('F')
+
+    def test_validate_country_invalid(self):
+        """Ensure validate_country raises an error if the country name is invalid."""
+        with self.assertRaises(ValidationError):
+            self.serializer.validate_country("Lalaland")
+
+    def test_validate_profile_picture_upload(self):
+        """Ensure validate_profile_picture field allows file uploads."""
+        self.assertEqual(self.serializer.validate_profile_picture(self.valid_image), self.valid_image)
+        
+    def test_validate_profile_picture_too_large(self):
+        """Ensure validate_profile_picture rejects images that exceeds dimension limits."""
+        with self.assertRaises(ValidationError):
+            self.serializer.validate_profile_picture(self.large_image)
+
+    def test_validate_profile_picture_invalid_format(self):
+        """Ensure validate_profile_picture rejects images with an invalid format."""
+        with self.assertRaises(ValidationError):
+            self.serializer.validate_profile_picture(self.invalid_format_image)
