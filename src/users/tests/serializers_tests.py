@@ -4,6 +4,7 @@ from users import serializers
 from users.serializers.user_serializer import UserSerializer
 from users.models.user_models import User
 from users.models.profile_models import UserProfile, Review, Experience
+from users.models.settings_models import Settings
 import pycountry
 from PIL import Image
 import io
@@ -16,6 +17,14 @@ from users.serializers.user_profile_serializers import (
     EducationSerializer,
     CareerSerializer,
     ExperienceSerializer
+)
+from users.serializers.user_settings_serializers import (
+    SettingsSerializer, 
+    SupportTicketSerializer,
+    PaymentSettingsSerializer,
+    NotificationPreferencesSerializer,
+    PasswordChangeSerializer,
+    ProfileSettingsSerializer
 )
 
 class UserSerializerTest(TestCase):
@@ -538,6 +547,55 @@ class ExperienceSerializerTest(TestCase):
         self.assertEqual(serializer.data['weight_display'], expected_display)
 
 
+class SettingsSerializerTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.settings = Settings.objects.create(user=self.user)
+        self.valid_data = {
+            'profile': {'first_name': 'Test'},
+            'account_security': {'old_password':'oldpassword'},
+            'notification_pref': {'booking_notifications': True},
+            'payment_settings': {'payment_method': 'bank_transfer'},
+            'support_help': {'issue_type': 'account'}
+        }
 
-  
-    
+    def test_valid_data(self):
+        """Test that serializer accepts valid JSON data."""
+        serializer = SettingsSerializer(data=self.valid_data)
+        self.assertTrue(serializer.is_valid())
+
+    def test_read_only_fields(self):
+        """Test that 'id' and 'user' are read-only."""
+        serializer = SettingsSerializer(instance=self.settings)
+        data = serializer.data
+        self.assertIn('id', data, f"Serialized data is missing 'id': {data}")
+        self.assertIn('user', data, f"Serialized data is missing 'user': {data}")
+        
+    def test_invalid_json_input(self):
+        """Test that serializer rejects invalid JSON structures."""
+        invalid_data = {
+            'profile': 'not a json',
+            'account_security': {'old_password':'oldpassword'},
+            'notification_pref': {'booking_notifications': True},
+            'payment_settings': {'payment_method': 'bank_transfer'},
+            'support_help': {'issue_type': 'account'}
+        }
+        serializer = SettingsSerializer(data=invalid_data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('profile', serializer.errors)
+
+    def test_defaults_for_missing_fields(self):
+        """Test that missing fields default to an empty dictionnary."""
+        serializer = SettingsSerializer(instance=self.settings)
+        data = serializer.data
+        self.assertEqual(data['profile'], {})
+        self.assertEqual(data['account_security'], {})
+        self.assertEqual(data['notification_pref'], {})
+        self.assertEqual(data['payment_settings'], {})
+        self.assertEqual(data['support_help'], {})

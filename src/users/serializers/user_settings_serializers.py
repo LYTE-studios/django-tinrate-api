@@ -259,8 +259,29 @@ class SettingsSerializer(serializers.ModelSerializer):
     """
     Serializer for the Settings model.
     """
+    def _validate_dict_field(self, value, field_name):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError(f"{field_name} must be a valid JSON object (dictionnary).")
+        return value
+
+    def validate_profile(self, value):
+        return self._validate_dict_field(value, 'Profile')
+    
+    def validate_account_security(self, value):
+        return self._validate_dict_field(value, 'Account Security')
+    
+    def validate_notification_pref(self, value):
+        return self._validate_dict_field(value, 'Notification Preferences')
+    
+    def validate_payment_settings(self, value):
+        return self._validate_dict_field(value, 'Payment Settings')
+    
+    def validate_support_help(self, value):
+        return self._validate_dict_field(value, 'Support Help')
+    
+
     class Meta:
         model = Settings
-        fields = ['profile', 'account_security', 'notification_pref', 
+        fields = ['id', 'user', 'profile', 'account_security', 'notification_pref', 
                   'payment_settings', 'support_help']
         read_only_fields = ['id', 'user']
