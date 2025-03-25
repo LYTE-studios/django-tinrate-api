@@ -233,7 +233,7 @@ class SupportTicketSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = SupportTicket
-        fields = ['issue_type', 'description']
+        fields = ['issue_type', 'description', 'created_at', 'resolved', 'resolution_notes']
         read_only_fields = ['created_at', 'resolved', 'resolution_notes']
 
     def validate_issue_type(self, value):
@@ -254,6 +254,42 @@ class SupportTicketSerializer(serializers.ModelSerializer):
         if value not in valid_choices:
             raise serializers.ValidationError(f"Issue type must be one of: {valid_choices}")
         return value
+    
+    def validate(self, attrs):
+        """
+        Custom validation to prevent any modifications to read-only fields.
+        
+        This method is called during serializer validation and will raise 
+        a ValidationError if any read-only fields are attempted to be modified.
+        """
+        # Get the current instance (if updating an existing object)
+        instance = getattr(self, 'instance', None)
+        
+        # If no instance exists, return attributes
+        if not instance:
+            return attrs
+        
+        # Check each read-only field
+        read_only_fields = self.Meta.read_only_fields
+        errors = {}
+        
+        for field in read_only_fields:
+            # Check if the field is in the input data
+            if field in attrs:
+                # Compare the input value with the current instance value
+                input_value = attrs[field]
+                current_value = getattr(instance, field)
+                
+                # If values differ, add to errors
+                if input_value != current_value:
+                    errors[field] = "This field is read-only and cannot be modified."
+        
+        # If any errors, raise ValidationError
+        if errors:
+            raise serializers.ValidationError(errors)
+        
+        return attrs
+
 
 class SettingsSerializer(serializers.ModelSerializer):
     """

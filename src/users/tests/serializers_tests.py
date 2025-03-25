@@ -4,10 +4,11 @@ from users import serializers
 from users.serializers.user_serializer import UserSerializer
 from users.models.user_models import User
 from users.models.profile_models import UserProfile, Review, Experience
-from users.models.settings_models import Settings
+from users.models.settings_models import Settings, SupportTicket
 import pycountry
 from PIL import Image
 import io
+from datetime import datetime
 from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 from users.serializers.user_profile_serializers import (
@@ -599,3 +600,82 @@ class SettingsSerializerTest(TestCase):
         self.assertEqual(data['notification_pref'], {})
         self.assertEqual(data['payment_settings'], {})
         self.assertEqual(data['support_help'], {})
+
+
+class SupportTicketSerializerTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.settings = Settings.objects.create(user=self.user)
+        self.ticket = SupportTicket.objects.create(
+            user=self.user,
+            issue_type='account',
+            description='issue with my account',
+            created_at=datetime.now(),
+            resolved=False,
+            resolution_notes=''
+        )
+        self.valid_data={
+            'issue_type':'payment',
+            'description':'issue with payment'
+        }
+        self.invalid_data={
+            'issue_type':'invalid_type',
+            'description':'issue with payment'
+        }
+    
+    def test_serializer_valid_data(self):
+        """Test serializer with valid data."""
+        serializer = SupportTicketSerializer(data=self.valid_data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_serializer_invalid_issue_type(self):
+        """Test serializer validation for an invalid issue_type."""
+        serializer = SupportTicketSerializer(data=self.invalid_data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('issue_type', serializer.errors)
+
+    def test_read_only_fields(self):
+        """Test that read-only fields are included in serialization but not accepted in input."""
+        serializer = SupportTicketSerializer(instance=self.ticket)
+        data = serializer.data
+
+        self.assertIn('created_at', data)
+        self.assertIn('resolved', data)
+        self.assertIn('resolution_notes', data)
+
+        original_created_at = self.ticket.created_at
+        original_resolved = self.ticket.resolved
+        original_resolution_notes = self.ticket.resolution_notes
+
+        invalid_update = {
+            "created_at": "2025-01-01T00:00:00Z",
+            "resolved": not original_resolved,
+            "resolution_notes": "Issue resolved.",
+        }
+        print("Read-only Fields:", SupportTicketSerializer.Meta.read_only_fields)
+        
+        serializer = SupportTicketSerializer(instance=self.ticket, data=invalid_update, partial=True)
+        print("Is Valid:", serializer.is_valid())
+        if serializer.is_valid():
+            print("Unexpectedly Valid Data:", serializer.validated_data)
+        print("Serializer Errors:", serializer.errors)
+        
+
+        self.assertFalse(serializer.is_valid(), "Serializer should reject updates to read-only fields")
+
+        self.assertIn('created_at', serializer.errors)
+        self.assertIn('resolved', serializer.errors)
+        self.assertIn('resolution_notes', serializer.errors)
+
+        self.ticket.refresh_from_db()  
+
+        self.assertEqual(self.ticket.created_at, original_created_at)
+        self.assertEqual(self.ticket.resolved, original_resolved)
+        self.assertEqual(self.ticket.resolution_notes, original_resolution_notes)
+                
