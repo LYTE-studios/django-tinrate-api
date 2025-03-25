@@ -3,7 +3,7 @@ from rest_framework.exceptions import ValidationError
 from users import serializers
 from users.serializers.user_serializer import UserSerializer
 from users.models.user_models import User
-from users.models.profile_models import UserProfile, Review
+from users.models.profile_models import UserProfile, Review, Experience
 import pycountry
 from PIL import Image
 import io
@@ -393,5 +393,151 @@ class EducationSerializerTest(TestCase):
         self.assertNotIn('picture', serializer.validated_data)
 
     
+class CareerSerializerTest(TestCase):
+    def setUp(self): 
+        self.serializer = UserProfileCreateUpdateSerializer()
+        self.valid_image = self.create_test_image("JPEG", (500,500))
+        self.large_image = self.create_test_image("JPEG", (5000,5000))
+        self.invalid_format_image = self.create_test_image("PDF", (600,600))
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            country='USA',
+            job_title='Developer',
+            company_name='TechCorp',
+            total_meetings=5,
+            meetings_completed=4,
+            total_minutes=300,
+            rating='0',
+            description="Experience software engineer specializing in Django."
+        )
+        self.career_data = {
+            'user_profile': self.profile,
+            'job_title':"Designer",
+            'company_name':'Apple',
+            'job_status':'full-time',
+            'picture': self.valid_image,
+        }
+        
+    def create_test_image(self, format='JPEG', size=(100,100),color=(255,0,0), file_size=None):
+        """Generates an in-memory image file for testing."""
+        image = Image.new("RGB", size, color)
+        img_io = io.BytesIO()
+        image.save(img_io, format=format)
+        img_io.seek(0)
+        return SimpleUploadedFile(f"test_image.{format.lower()}",
+                                  img_io.getvalue(),
+                                  content_type=f"image/{format.lower()}")
+    
+    def test_validate_profile_picture_upload(self):
+        """Ensure validate_profile_picture field allows file uploads."""
+        self.assertEqual(self.serializer.validate_profile_picture(self.valid_image), self.valid_image)
+        
+    def test_validate_profile_picture_too_large(self):
+        """Ensure validate_profile_picture rejects images that exceeds dimension limits."""
+        with self.assertRaises(ValidationError):
+            self.serializer.validate_profile_picture(self.large_image)
 
+    def test_validate_profile_picture_invalid_format(self):
+        """Ensure validate_profile_picture rejects images with an invalid format."""
+        with self.assertRaises(ValidationError):
+            self.serializer.validate_profile_picture(self.invalid_format_image)
+
+    def test_invalid_job_status(self):
+        """Test that an invalid job status raises a validation error."""
+        invalid_data = self.career_data.copy()
+        invalid_data['job_status'] = 'invalid_status'
+        serializer = CareerSerializer(data=invalid_data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("job_status", serializer.errors)
+
+    def test_valid_job_status(self):
+        """Test that an valid job status passes validation."""
+        valid_data = self.career_data.copy()
+        valid_data['job_status'] = 'part-time'
+        serializer = CareerSerializer(data=valid_data)
+        self.assertTrue(serializer.is_valid())
+        self.assertIn("job_status", 'part-time')
+
+
+class ExperienceSerializerTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            country='USA',
+            job_title='Developer',
+            company_name='TechCorp',
+            total_meetings=5,
+            meetings_completed=4,
+            total_minutes=300,
+            rating='0',
+            description="Experience software engineer specializing in Django."
+        )
+        self.experience_data = {
+            'user_profile': self.profile,
+            'name': 'Experience',
+            'weight': 1
+        }
+    
+    def test_valid_serializer(self):
+        """Test that a valid serializer instance is created successfully."""
+        serializer = ExperienceSerializer(data=self.experience_data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_invalid_weight(self):
+        """Test that an invalid weight value raises a validation error."""
+        invalid_data = self.experience_data.copy()
+        invalid_data['weight'] = 'invalid_weight'
+
+        serializer = ExperienceSerializer(data=invalid_data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('weight', serializer.errors)
+
+    def test_valid_weight(self):
+        """Test that an valid weight value passes validation."""
+        valid_data = self.experience_data.copy()
+        valid_data['weight'] = 2
+
+        serializer = ExperienceSerializer(data=valid_data)
+        self.assertTrue(serializer.is_valid())
+        self.assertIn('weight', serializer.validated_data)
+        self.assertEqual(serializer.validated_data['weight'], 2)
+
+    def test_missing_weight(self):
+        """Test that missing weight field raises a validation error."""
+        data_mising = {
+            'user_profile': self.profile,
+            'name': 'Experience',
+        }
+        serializer = ExperienceSerializer(data=data_mising)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("weight", serializer.errors)
+
+    def test_weight_display(self):
+        """Test that weight_display returns the correct human-readable value."""
+        experience = Experience.objects.create(
+            user_profile = self.profile,
+            name = 'Designer',
+            weight = 3
+        )
+        serializer = ExperienceSerializer(instance=experience)
+        expected_display = experience.get_weight_display()
+        self.assertEqual(serializer.data['weight_display'], expected_display)
+
+
+
+  
     
