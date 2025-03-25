@@ -308,3 +308,90 @@ class ReviewSerializerTest(TestCase):
                 'comment':'Great service!',
             })
             serializer.is_valid(raise_exception=True)
+
+
+class EducationSerializerTest(TestCase):
+    def setUp(self):
+        
+        self.serializer = UserProfileCreateUpdateSerializer()
+        self.valid_image = self.create_test_image("JPEG", (500,500))
+        self.large_image = self.create_test_image("JPEG", (5000,5000))
+        self.invalid_format_image = self.create_test_image("PDF", (600,600))
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            country='USA',
+            job_title='Developer',
+            company_name='TechCorp',
+            total_meetings=5,
+            meetings_completed=4,
+            total_minutes=300,
+            rating='0',
+            description="Experience software engineer specializing in Django."
+        )
+        self.education_data = {
+            'user_profile': self.profile,
+            'school_name':"University",
+            'diploma':'Bachelor',
+            'description':'Bachelor at University',
+            'picture': self.valid_image,
+        }
+        
+    def create_test_image(self, format='JPEG', size=(100,100),color=(255,0,0), file_size=None):
+        """Generates an in-memory image file for testing."""
+        image = Image.new("RGB", size, color)
+        img_io = io.BytesIO()
+        image.save(img_io, format=format)
+        img_io.seek(0)
+        return SimpleUploadedFile(f"test_image.{format.lower()}",
+                                  img_io.getvalue(),
+                                  content_type=f"image/{format.lower()}")
+    
+    def test_validate_profile_picture_upload(self):
+        """Ensure validate_profile_picture field allows file uploads."""
+        self.assertEqual(self.serializer.validate_profile_picture(self.valid_image), self.valid_image)
+        
+    def test_validate_profile_picture_too_large(self):
+        """Ensure validate_profile_picture rejects images that exceeds dimension limits."""
+        with self.assertRaises(ValidationError):
+            self.serializer.validate_profile_picture(self.large_image)
+
+    def test_validate_profile_picture_invalid_format(self):
+        """Ensure validate_profile_picture rejects images with an invalid format."""
+        with self.assertRaises(ValidationError):
+            self.serializer.validate_profile_picture(self.invalid_format_image)
+    
+    def test_missing_picture(self):
+        """Test that missing picture field does not raise validation error."""
+        missing_picture = {
+            'user_profile': self.profile.id,
+            'school_name':"University",
+            'diploma':'Bachelor',
+            'description':'Bachelor at University',
+            'picture': None,
+        }
+        serializer = EducationSerializer(data=missing_picture)  
+        self.assertTrue(serializer.is_valid(), "Serializer should be valid with None picture")
+        self.assertIsNone(serializer.validated_data['picture'])
+
+    def test_valid_picture_with_optional_field(self):
+        """Test that picture field can be omitted without issues."""
+        missing_picture = {
+            'user_profile': self.profile.id,
+            'school_name':"University",
+            'diploma':'Bachelor',
+            'description':'Bachelor at University', 
+        }
+        serializer = EducationSerializer(data=missing_picture)
+        self.assertTrue(serializer.is_valid(), "Serializer should be valid without picture")
+        self.assertNotIn('picture', serializer.validated_data)
+
+    
+
+    
