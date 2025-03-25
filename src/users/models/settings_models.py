@@ -23,11 +23,11 @@ class Settings(models.Model):
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="settings")
-    profile = models.JSONField(null=True, blank=True)
-    account_security = models.JSONField(null=True, blank=True)
-    notification_pref = models.JSONField(null=True, blank=True)
-    payment_settings = models.JSONField(null=True, blank=True)
-    support_help = models.JSONField(null=True, blank=True)
+    profile = models.JSONField(null=True, blank=True, default=dict)
+    account_security = models.JSONField(null=True, blank=True, default=dict)
+    notification_pref = models.JSONField(null=True, blank=True, default=dict)
+    payment_settings = models.JSONField(null=True, blank=True, default=dict)
+    support_help = models.JSONField(null=True, blank=True, default=dict)
 
     def __str__(self):
         return f"Settings for {self.user.username}"

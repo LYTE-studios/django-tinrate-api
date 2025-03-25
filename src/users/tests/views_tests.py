@@ -8,7 +8,8 @@ from django.contrib.auth import get_user_model
 from io import BytesIO
 from PIL import Image
 import json
-from users.models.settings_models import NotificationPreferences, PaymentSettings, SupportTicket
+from users.models import settings_models
+from users.models.settings_models import NotificationPreferences, PaymentSettings, Settings, SupportTicket
 from users.views.profile_views import (
     UserProfileViewSet,
     ExperienceViewSet,
@@ -789,7 +790,6 @@ class PasswordSettingsViewSetTest(APITestCase):
         self.user_profile = UserProfile.objects.create(user=self.user, country='USA', job_title='Developer') 
         self.client.force_authenticate(self.user)
         self.url = reverse('password_settings-change-password')
-        self.client.force_authenticate(self.user)
 
     def test_change_password_success(self):
         """Test changing the password with valid input."""
@@ -1065,3 +1065,53 @@ class SupportTicketViewSetTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
         
+class SettingsViewSetTest(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.user_profile = UserProfile.objects.create(user=self.user, country='USA', job_title='Developer') 
+        self.client.force_authenticate(self.user)
+        self.url_profile = reverse('general_settings-profile')
+        self.url_security = reverse('general_settings-account-security')
+        self.url_notification = reverse('general_settings-notification-pref')
+        self.url_payment = reverse('general_settings-payment-settings')
+        self.url_support = reverse('general_settings-support-help')
+        self.url_retrieve = reverse('general_settings-retrieve-settings')
+        self.setting = Settings.objects.create(user=self.user)
+
+    def test_retrieve_settings(self):
+        """Test retrieving the general settings."""
+        response = self.client.get(self.url_retrieve)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_retrieve_profile(self):
+        """Test retrieving the profile settings."""
+        response = self.client.get(self.url_profile)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_retrieve_account_security(self):
+        """Test retrieving the account security settings."""
+        response = self.client.get(self.url_security)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_retrieve_notification_preferences(self):
+        """Test retrieving the notification preferences."""
+        response = self.client.get(self.url_notification)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_retrieve_payment_settings(self):
+        """Test retrieving the payment settings."""
+        response = self.client.get(self.url_payment)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_retrieve_support_help(self):
+        """Test retrieving the support help settings."""
+        response = self.client.get(self.url_support)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    
