@@ -163,7 +163,7 @@ class UserProfileSerializerTest(TestCase):
             rating='0',
             description="Experience software engineer specializing in Django."
         )
-        self.serializer = UserProfileSerializer()
+        self.serializer = UserProfileSerializer(self.profile2)
     
     
 
@@ -181,5 +181,130 @@ class UserProfileSerializerTest(TestCase):
             comment='Great profile!',
             rating=4,
         )
-        serializer = UserProfileSerializer(self.profile2)
-        self.assertEqual(serializer.data['average_rating'], 4.5)
+        self.assertEqual(self.serializer.data['average_rating'], 4.5)
+
+    def test_get_average_rating_no_review(self):
+        """Test that the average rating is 0 when no reviews exist."""
+        self.assertEqual(self.serializer.data['average_rating'], 0.0)
+
+
+class ReviewSerializerTest(TestCase):
+    def setUp(self):
+        self.user1 = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.profile1 = UserProfile.objects.create(
+            user=self.user1,
+            country='USA',
+            job_title='Developer',
+            company_name='TechCorp',
+            total_meetings=5,
+            meetings_completed=4,
+            total_minutes=300,
+            rating='0',
+            description="Experience software engineer specializing in Django."
+        )
+        self.user2 = User.objects.create_user(
+            username='testuser2',
+            email='test2@example.com',
+            password='password123',
+            first_name='Test2',
+            last_name='User',
+        )
+        self.profile2 = UserProfile.objects.create(
+            user=self.user2,
+            country='USA',
+            job_title='Developer',
+            company_name='TechCorp',
+            total_meetings=5,
+            meetings_completed=4,
+            total_minutes=300,
+            rating='0',
+            description="Experience software engineer specializing in Django."
+        )
+        self.review_data = {
+            'user_profile':self.profile2,
+            'reviewer':self.user1.id,
+            'rating':8,
+            'comment':'Great service!',
+        }
+
+    def test_valid_review_serializer(self):
+        """Test that a valid review is serialized correctly."""
+        serializer = ReviewSerializer()
+        valid_ratings = [0, 5, 10]
+        for rating in valid_ratings:
+            try:
+                result = serializer.validate_rating(rating)
+                self.assertEqual(result, rating, f"Rating {rating} should be valid.")
+            except serializers.ValidationError:
+                self.fail(f"Rating {rating} should not raise a ValidationError.")
+
+    def test_validate_rating_invalid(self):
+        """Test that invalid ratings raise a ValidationError."""
+        invalid_ratings = [-1, 11, -10, 100]
+        with self.assertRaises(ValidationError):
+            serializer = ReviewSerializer(data={'rating':invalid_ratings})
+            serializer.is_valid(raise_exception=True)
+
+    def test_serializer_with_valid_data(self):
+        """Test creating a serializer with a valid review data."""
+        serializer = ReviewSerializer(data=self.review_data)
+        self.assertTrue(serializer.is_valid(),
+                        f"Serializer errors: {serializer.errors}")
+        self.assertEqual(serializer.validated_data['rating'], 8)
+        self.assertEqual(serializer.validated_data['comment'], 'Great service!')
+        self.assertEqual(serializer.validated_data['reviewer'], self.user1)
+
+    def test_serializer_read_only_fields(self):
+        """Verify that read-only fields cannot be modified."""
+        data={
+            'user_profile':self.profile2,
+            'reviewer':self.user1.id,
+            'rating':8,
+            'comment':'Great service!',
+        }
+        serializer = ReviewSerializer(data=data)
+        self.assertTrue(serializer.is_valid())
+        print(serializer.errors)
+        validated_data = serializer.validated_data
+        self.assertNotIn('id', validated_data)
+        self.assertNotIn('reviewer_info', validated_data)
+
+    def test_serializer_missing_fields(self):
+        """Test serializer behavior with missing required fields."""
+        incomplete_data = {
+            'user_profile':self.profile2,
+            'reviewer':self.user1.id,
+            'rating':8,
+        }
+        serializer = ReviewSerializer(data=incomplete_data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('comment', serializer.errors)
+
+    def test_reviewer_info_population(self):
+        """Verify that reviewer_info is populated correctly."""
+        review = Review.objects.create(
+            user_profile = self.profile2,
+            reviewer = self.user1,
+            rating = 8,
+            comment = 'Great service!'
+        )
+        serializer = ReviewSerializer(review)
+        self.assertIn('reviewer_info', serializer.data)
+        self.assertEqual(serializer.data['reviewer_info']['username'],self.user1.username)
+
+    def test_rating_type_validation(self):
+        """Ensure rating only accepts numeric types."""
+        with self.assertRaises(ValidationError):
+            serializer = ReviewSerializer(data={
+                'user_profile':self.profile2,
+                'reviewer':self.user1.id,
+                'rating':'invalid_rating',
+                'comment':'Great service!',
+            })
+            serializer.is_valid(raise_exception=True)
