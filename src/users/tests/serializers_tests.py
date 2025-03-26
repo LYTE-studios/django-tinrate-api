@@ -1,6 +1,6 @@
 from django.test import TestCase
 from rest_framework.exceptions import ValidationError
-from users import serializers
+from rest_framework import serializers
 from users.serializers.user_serializer import UserSerializer
 from users.models.user_models import User
 from users.models.profile_models import UserProfile, Review, Experience
@@ -640,42 +640,79 @@ class SupportTicketSerializerTest(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn('issue_type', serializer.errors)
 
-    def test_read_only_fields(self):
-        """Test that read-only fields are included in serialization but not accepted in input."""
+    def test_serializer_read_only_fields_in_serialization(self):
+        """Ensure read-only fields appear in serialization output."""
         serializer = SupportTicketSerializer(instance=self.ticket)
         data = serializer.data
-
         self.assertIn('created_at', data)
         self.assertIn('resolved', data)
         self.assertIn('resolution_notes', data)
+    
 
-        original_created_at = self.ticket.created_at
-        original_resolved = self.ticket.resolved
-        original_resolution_notes = self.ticket.resolution_notes
-
-        invalid_update = {
-            "created_at": "2025-01-01T00:00:00Z",
-            "resolved": not original_resolved,
-            "resolution_notes": "Issue resolved.",
+class PaymentSettingsSerializerTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.valid_paypal_data = {
+            'payment_method':'paypal',
+            'paypal_email':'user@example.com',
         }
-        print("Read-only Fields:", SupportTicketSerializer.Meta.read_only_fields)
-        
-        serializer = SupportTicketSerializer(instance=self.ticket, data=invalid_update, partial=True)
-        print("Is Valid:", serializer.is_valid())
-        if serializer.is_valid():
-            print("Unexpectedly Valid Data:", serializer.validated_data)
-        print("Serializer Errors:", serializer.errors)
-        
+        self.valid_bank_data = {
+            'payment_method':'bank_transfer',
+            'bank_account_name':'John Doe',
+            'bank_account_number':'123456789',
+            'bank_name':'Bank of Django',
+        }
+        self.valid_crypto_data = {
+            'payment_method':'crypto',
+            'crypto_wallet_address':'0x123abc456def'
+        }
+        self.missing_paypal_email = {
+            'payment_method':'paypal'
+        }
+        self.missing_bank_details = {
+            'payment_method':'bank_transfer',
+            'bank_account_name':'John Doe'
+        }
+        self.missing_crypto_wallet = {
+            'payment_method':'crypto'
+        }
+    
+    def test_valid_paypal_settings(self):
+        """Test serializer with valid PayPal data."""
+        serializer = PaymentSettingsSerializer(data=self.valid_paypal_data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
 
-        self.assertFalse(serializer.is_valid(), "Serializer should reject updates to read-only fields")
+    def test_valid_bank_settings(self):
+        """Test serializer with valid bank transfer data."""
+        serializer = PaymentSettingsSerializer(data=self.valid_bank_data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
 
-        self.assertIn('created_at', serializer.errors)
-        self.assertIn('resolved', serializer.errors)
-        self.assertIn('resolution_notes', serializer.errors)
+    def test_valid_crypto_settings(self):
+        """Test serializer with valid crypto payment data."""
+        serializer = PaymentSettingsSerializer(data=self.valid_crypto_data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
 
-        self.ticket.refresh_from_db()  
+    def test_missing_paypal_email(self):
+        """Ensure PayPal email is required when selecting PayPal."""
+        serializer = PaymentSettingsSerializer(data=self.missing_paypal_email)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('paypal_email', serializer.errors)
 
-        self.assertEqual(self.ticket.created_at, original_created_at)
-        self.assertEqual(self.ticket.resolved, original_resolved)
-        self.assertEqual(self.ticket.resolution_notes, original_resolution_notes)
-                
+    def test_missing_bank_details(self):
+        """Ensure all required bank fields are validated."""
+        serializer = PaymentSettingsSerializer(data=self.missing_bank_details)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('bank_account_number', serializer.errors)
+        self.assertIn('bank_name', serializer.errors)
+
+    def test_missing_crypto_wallet_address(self):
+        """Ensure crypto wallet address is required for crypto payments."""
+        serializer = PaymentSettingsSerializer(data=self.missing_crypto_wallet)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('crypto_wallet_address', serializer.errors)

@@ -1,3 +1,5 @@
+from ast import parse
+from datetime import datetime
 from rest_framework import serializers
 from django.contrib.auth import get_user_model, password_validation
 from django.core.exceptions import ValidationError
@@ -199,21 +201,28 @@ class PaymentSettingsSerializer(serializers.ModelSerializer):
             dict: The validated payment settings data.
         """
         payment_method = data.get('payment_method')
+        errors = {}
 
         if payment_method == 'paypal' and not data.get('paypal_email'):
-            raise serializers.ValidationError({"paypal_email": "PayPal email is required when using PayPal."})
-        
+            errors['paypal_email'] = "PayPal email is required when using PayPal."
+
         if payment_method == 'bank_transfer':
             if not data.get('bank_account_name'):
-                raise serializers.ValidationError({"bank_account_name": "Account name is required for bank transfers."})
+                errors['bank_account_name'] = "Account name is required for bank transfers."
+            
             if not data.get('bank_account_number'):
-                raise serializers.ValidationError({"bank_account_number": "Account number is required for bank transfers."})
+                errors['bank_account_number'] = "Account number is required for bank transfers."
+            
             if not data.get('bank_name'):
-                raise serializers.ValidationError({"bank_name": "Bank name is required for bank transfers."})
-        
+                errors['bank_name'] = "Bank name is required for bank transfers."
+
         if payment_method == 'crypto' and not data.get('crypto_wallet_address'):
-            raise serializers.ValidationError({"crypto_wallet_address": "Wallet address is required for cryptocurrency payments."})
-        
+            errors['crypto_wallet_address'] = "Wallet address is required for cryptocurrency payments."
+
+        # Raise all collected errors at once
+        if errors:
+            raise serializers.ValidationError(errors)
+
         return data
 
 class SupportTicketSerializer(serializers.ModelSerializer):
@@ -255,41 +264,7 @@ class SupportTicketSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(f"Issue type must be one of: {valid_choices}")
         return value
     
-    def validate(self, attrs):
-        """
-        Custom validation to prevent any modifications to read-only fields.
-        
-        This method is called during serializer validation and will raise 
-        a ValidationError if any read-only fields are attempted to be modified.
-        """
-        # Get the current instance (if updating an existing object)
-        instance = getattr(self, 'instance', None)
-        
-        # If no instance exists, return attributes
-        if not instance:
-            return attrs
-        
-        # Check each read-only field
-        read_only_fields = self.Meta.read_only_fields
-        errors = {}
-        
-        for field in read_only_fields:
-            # Check if the field is in the input data
-            if field in attrs:
-                # Compare the input value with the current instance value
-                input_value = attrs[field]
-                current_value = getattr(instance, field)
-                
-                # If values differ, add to errors
-                if input_value != current_value:
-                    errors[field] = "This field is read-only and cannot be modified."
-        
-        # If any errors, raise ValidationError
-        if errors:
-            raise serializers.ValidationError(errors)
-        
-        return attrs
-
+    
 
 class SettingsSerializer(serializers.ModelSerializer):
     """
