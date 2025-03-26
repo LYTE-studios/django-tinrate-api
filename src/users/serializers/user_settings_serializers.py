@@ -10,6 +10,7 @@ from users.models import (
     SupportTicket,
     Settings
 )
+from django.core.files.images import get_image_dimensions
 
 User = get_user_model()
 
@@ -55,6 +56,38 @@ class ProfileSettingsSerializer(serializers.ModelSerializer):
             user.save()
 
         return super().update(instance, validated_data)
+    
+    def validate_picture(self, value):
+        """
+        Validates the uploaded picture.
+        
+        Args:
+            value (UploadedFile): The uploaded image file.
+
+        Raises:
+            serializers.ValidationError: If the file is not a valid image, exceeds size limits,
+            or has invalid dimensions.
+
+        Returns:
+            UploadedFile: The validated profile picture.
+        
+        """
+        if value is None:
+            return value
+        
+        max_size = 5 * 1024 * 1024
+        allowed_formats = ['image/jpeg',"image/png"]
+
+        if value.size > max_size:
+            raise serializers.ValidationError("Picture must be less than 5MB.")
+        if value.content_type not in allowed_formats:
+            raise serializers.ValidationError("Only JPEG and PNG formats are allowed.")
+        
+        width, height = get_image_dimensions(value)
+        if width > 4000 or height > 4000:
+            raise serializers.ValidationError("Image dimensions must not exceed 4000x4000 pixels.")
+        
+        return value
     
 
 class PasswordChangeSerializer(serializers.Serializer):

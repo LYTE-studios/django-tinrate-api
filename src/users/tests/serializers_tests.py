@@ -818,3 +818,97 @@ class PasswordChangeSerializerTest(APITestCase):
         serializer.save()
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password(self.data['new_password1']))
+
+class ProfileSettingsSerializerTest(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.profile = UserProfile.objects.create(
+            user=self.user,
+            country='USA',
+            description="Experience software engineer specializing in Django."
+        )
+        self.valid_image = self.create_test_image("JPEG", (500,500))
+        self.large_image = self.create_test_image("JPEG", (5000,5000))
+        self.invalid_format_image = self.create_test_image("PDF", (600,600))
+        self.data = {
+            'profile_picture': self.valid_image,
+            'first_name': 'John',
+            'last_name': 'User',
+            'description':'This is a description.'
+        }
+        self.serializer = ProfileSettingsSerializer()
+        self.factory = APIRequestFactory()
+        self.request = self.factory.post('/test-url/')
+        self.request.user = self.user
+
+        self.client.force_authenticate(user=self.user)
+
+    def create_test_image(self, format='JPEG', size=(100,100),color=(255,0,0), file_size=None):
+        """Generates an in-memory image file for testing."""
+        image = Image.new("RGB", size, color)
+        img_io = io.BytesIO()
+        image.save(img_io, format=format)
+        img_io.seek(0)
+        return SimpleUploadedFile(f"test_image.{format.lower()}",
+                                  img_io.getvalue(),
+                                  content_type=f"image/{format.lower()}")
+    
+    def test_validate_profile_picture_upload(self):
+        """Ensure validate_profile_picture field allows file uploads."""
+        self.assertEqual(self.serializer.validate_picture(self.valid_image), self.valid_image)
+        
+    def test_validate_profile_picture_too_large(self):
+        """Ensure validate_profile_picture rejects images that exceeds dimension limits."""
+        with self.assertRaises(ValidationError):
+            self.serializer.validate_picture(self.large_image)
+
+    def test_validate_profile_picture_invalid_format(self):
+        """Ensure validate_profile_picture rejects images with an invalid format."""
+        with self.assertRaises(ValidationError):
+            self.serializer.validate_picture(self.invalid_format_image)
+
+    def test_valid_update_profile(self):
+        """Test updating user profile settings with valid data."""
+        serializer = ProfileSettingsSerializer(instance=self.profile, data=self.data, context={'request': self.request})
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'John')
+        self.assertEqual(self.user.last_name, 'User')
+        self.assertEqual(self.profile.description, 'This is a description.')
+
+    def test_udpate_profile_with_missing_data(self):
+        """Test profile update with missing data."""
+        new_data = self.data.copy()
+        new_data.pop('first_name')
+        serializer = ProfileSettingsSerializer(instance=self.profile, data=new_data, context={'request':self.request})
+        self.assertFalse(serializer.is_valid(), serializer.errors)
+        self.assertIn('first_name', serializer.errors)
+
+    def test_update_invalid_user_data(self):
+        """Test profile update with invalid data."""
+        new_data = self.data.copy()
+        new_data['first_name'] = ''
+        serializer = ProfileSettingsSerializer(instance=self.profile, data=new_data, context={'request':self.request})
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('first_name', serializer.errors, 'This field may not be blank.')
+
+    def test_save_and_update(self):
+        """Ensure save() updates both user and profile correctly."""
+        serializer = ProfileSettingsSerializer(instance=self.profile, data=self.data, context={'request':self.request})
+        self.assertTrue(serializer.is_valid())
+        serializer.save()
+        self.profile.refresh_from_db()
+        self.assertEqual(self.user.first_name, 'John')
+        self.assertEqual(self.user.last_name, 'User')
+        self.assertEqual(self.profile.description, 'This is a description.')
+        self.assertTrue(self.profile.profile_picture.name.startswith('profile_pictures/test_image'))
+
+
