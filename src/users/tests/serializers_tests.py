@@ -1,6 +1,7 @@
 from django.test import TestCase
 from rest_framework.exceptions import ValidationError
 from rest_framework import serializers
+from rest_framework.test import APIClient, APITestCase, APIRequestFactory
 from users.serializers.user_serializer import UserSerializer
 from users.models.user_models import User
 from users.models.profile_models import UserProfile, Review, Experience
@@ -753,3 +754,67 @@ class NotificationPreferencesSerializerTest(TestCase):
         serializer = NotificationPreferencesSerializer(data=data) 
         self.assertFalse(serializer.is_valid())
         self.assertIn('preferred_method', serializer.errors)
+
+
+class PasswordChangeSerializerTest(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            password='password123',
+            first_name='Test',
+            last_name='User',
+        )
+        self.data = {
+            'old_password':'password123',
+            'new_password1':'newpassword123',
+            'new_password2':'newpassword123',
+        }
+        self.client.force_authenticate(user=self.user)
+        self.factory = APIRequestFactory()
+        self.request = self.factory.post('/test-url/')
+        self.request.user = self.user
+
+    def test_valid_password_change(self):
+        """Test password change with valid data."""
+        serializer = PasswordChangeSerializer(data=self.data, context={'request':self.request})
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(self.data['new_password1']))
+
+    def test_invalid_old_password(self):
+        """Test password change with an incorrect old password."""
+        new_data = self.data.copy()
+        new_data['old_password'] = 'wrongpassword'
+        serializer = PasswordChangeSerializer(data=new_data, context={'request':self.request})
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('old_password', serializer.errors)
+        self.assertEqual(serializer.errors['old_password'][0],'Your old password is incorrect.')
+
+    def test_mismatched_new_password(self):
+        """Test password change with mismatched new passwords."""
+        new_data = self.data.copy()
+        new_data['new_password1'] = 'wrongpassword'
+        serializer = PasswordChangeSerializer(data=new_data, context={'request': self.request})
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('new_password2', serializer.errors)
+        self.assertEqual(serializer.errors['new_password2'][0], 'The two password fields do not match.')
+    
+    def test_weak_new_password(self):
+        """Test password change with a weak new password."""
+        new_data = self.data.copy()
+        new_data['new_password1'] = '123'
+        new_data['new_password2'] = '123'
+        serializer = PasswordChangeSerializer(data=new_data, context={'request':self.request})
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('new_password1', serializer.errors)
+    
+    def test_save_change_password(self):
+        """Ensure save() updates the user's password correctly."""
+        serializer = PasswordChangeSerializer(data=self.data, context={'request': self.request})
+        self.assertTrue(serializer.is_valid())
+        serializer.save()
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(self.data['new_password1']))
