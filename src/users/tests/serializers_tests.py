@@ -4,7 +4,7 @@ from rest_framework import serializers
 from users.serializers.user_serializer import UserSerializer
 from users.models.user_models import User
 from users.models.profile_models import UserProfile, Review, Experience
-from users.models.settings_models import Settings, SupportTicket
+from users.models.settings_models import Settings, SupportTicket, NotificationPreferences
 import pycountry
 from PIL import Image
 import io
@@ -716,3 +716,40 @@ class PaymentSettingsSerializerTest(TestCase):
         serializer = PaymentSettingsSerializer(data=self.missing_crypto_wallet)
         self.assertFalse(serializer.is_valid())
         self.assertIn('crypto_wallet_address', serializer.errors)
+
+
+class NotificationPreferencesSerializerTest(TestCase):
+    def setUp(self):
+        self.valid_data = {
+            'booking_notifications': True,
+            'payments_notifications': False,
+            'meeting_reminders': True,
+            'updates_promotions': False,
+            'preferred_method': NotificationPreferences.NOTIFICATION_METHODS[0][0],
+        }
+        self.invalid_data = self.valid_data.copy()
+        self.invalid_data['preferred_method'] = 'invalid_method'
+
+    def test_valid_serializer(self):
+        """Test serializer with valid data."""
+        serializer = NotificationPreferencesSerializer(data=self.valid_data)
+        self.assertTrue(serializer.is_valid())
+        self.assertEqual(serializer.validated_data['preferred_method'], self.valid_data['preferred_method'])
+
+    def test_invalid_preferred_method(self):
+        """Test serializer with an invalid preferred method."""
+        serializer = NotificationPreferencesSerializer(data=self.invalid_data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('preferred_method', serializer.errors)
+        self.assertEqual(
+            serializer.errors['preferred_method'][0],
+            '"invalid_method" is not a valid choice.'
+        )
+
+    def test_missing_preferred_method(self):
+        """Test serializer with missing preferred method"""
+        data  = self.valid_data.copy()
+        data.pop('preferred_method', None)
+        serializer = NotificationPreferencesSerializer(data=data) 
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('preferred_method', serializer.errors)
