@@ -12,7 +12,6 @@ class User(AbstractUser):
         last_name (CharField): Last name of the user.
         username (CharField): Unique username for the user.
         email (CharField): Unique email address of the user.
-        allow_cancellation_fee (BooleanField): Flag indicating whether the user allows cancellation fees.
     
     Methods:
         __str__: Returns the username of the user for string representation.
@@ -23,7 +22,6 @@ class User(AbstractUser):
     last_name = models.CharField(max_length=64, null=True)
     username = models.CharField(max_length=64, null=True, unique=True)
     email = models.CharField(max_length=64, null=False, unique=True)
-    allow_cancellation_fee = models.BooleanField(default=False)
 
     def __str__(self):
         return self.username
