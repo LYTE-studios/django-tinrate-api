@@ -4,28 +4,6 @@ from users.models.profile_models import UserProfile, Experience
 from users.models.settings_models import PaymentSettings
 
 
-class Listing(models.Model):
-    """
-    Represents a service listing created by a user.
-
-    Attributes:
-        user_profile (ForeignKey): Links the listing to the user's profile.
-        experience (ForeignKey): Links the listing to a relevant experience.
-        pricing_per_hour (DecimalField): The hourly price for the service.
-        service_description (TextField): A description of the service offered.
-        availability (JSONField): JSON data defining the expert's availability.
-        completion_status (BooleanField): Indicates whether the listing is active or completed.
-    """
-    user_profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE, null=True)
-    experience = models.ForeignKey(Experience, on_delete=models.CASCADE, null=True)
-
-    pricing_per_hour = models.DecimalField(max_digits=10, decimal_places=2)
-    service_description = models.TextField(max_length=500, null=True, blank=True)
-    availability = models.JSONField()
-    completion_status = models.BooleanField(default=False)
-
-    def __str__(self):
-        return f"Listing by {self.user_profile.user.first_name} {self.user_profile.user.last_name}"
     
 class Day(models.Model):
     """
@@ -56,6 +34,7 @@ class Day(models.Model):
         return self.day_of_week.capitalize()
     
 
+
 class Availability(models.Model):
     """
     Represents an expert's weekly availability, linking to specific days.
@@ -64,8 +43,6 @@ class Availability(models.Model):
         listing (ForeignKey): The listing that this availability applies to.
         monday-sunday (ForeignKey): Links each day of the week to a `Day` instance.
     """
-
-    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='availabilities')
 
     monday = models.ForeignKey(Day, related_name="monday_availability", on_delete=models.SET_NULL, null=True, blank=True)
     tuesday = models.ForeignKey(Day, related_name="tuesday_availability", on_delete=models.SET_NULL, null=True, blank=True)
@@ -77,6 +54,30 @@ class Availability(models.Model):
 
     def __str__(self):
         return f"Availability for {self.listing.user_profile.user.first_name} {self.listing.user_profile.user.last_name}" 
+
+class Listing(models.Model):
+    """
+    Represents a service listing created by a user.
+
+    Attributes:
+        user_profile (ForeignKey): Links the listing to the user's profile.
+        experience (ForeignKey): Links the listing to a relevant experience.
+        pricing_per_hour (DecimalField): The hourly price for the service.
+        service_description (TextField): A description of the service offered.
+        availability (OneToOneField): The availability related to the listing.
+        completion_status (BooleanField): Indicates whether the listing is active or completed.
+    """
+    user_profile = models.ForeignKey(UserProfile, on_delete=models.CASCADE, null=True)
+    experience = models.ForeignKey(Experience, on_delete=models.CASCADE, null=True)
+
+    pricing_per_hour = models.DecimalField(max_digits=10, decimal_places=2)
+    service_description = models.TextField(max_length=500, null=True, blank=True)
+    availability = models.OneToOneField(Availability, on_delete=models.CASCADE)
+    completion_status = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Listing by {self.user_profile.user.first_name} {self.user_profile.user.last_name}"
+
 
 class Meeting(models.Model):
     """
