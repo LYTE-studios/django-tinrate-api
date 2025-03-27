@@ -181,12 +181,155 @@ class ListingViewSet(viewsets.ModelViewSet):
 
 
 class DayViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing individual days within a user's availability.
+
+    This viewset allows authenticated users to:
+    - Retrieve their availability days (`GET`).
+    - Toggle availability on/off for a given day (`PATCH`).
+    - Users cannot manually create or delete days, as all seven days exist by default.
+
+    Restrictions:
+    - Users can only view or modify days associated with their own listings.
+    - Prevents unauthorized modifications to other users' availability schedules.
+    """
+    
     queryset = Day.objects.all()
     serializer_class = DaySerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        """
+        Retrieve all seven days for each availability associated with the user's listings.
+
+        Returns:
+            QuerySet: Days related to the authenticated user's availabilities.
+        """
+        return Day.objects.filter(availability__listing__user_profile__user=self.request.user)
+    
+    def perform_update(self, serializer):
+        """
+        Toggle the availability status for an existing day.
+
+        Raises:
+            PermissionDenied: If the user does not own the listing.
+
+        Args:
+            serializer (DaySerializer): The serializer instance containing updated day data.
+
+        Returns:
+            Day: The updated day instance.
+        """
+        day = self.get_object()
+        if day.availability.listing.user_profile.user != self.request.user:
+            raise PermissionDenied("You cannot modify availability days that do not belong to you.")
+        serializer.save()
+
 
 class AvailabilityViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing availability settings for a listing.
+
+    This viewset allows authenticated users to:
+    - Retrieve their availabilities (`GET`).
+    - Create availability for a listing they own (`POST`).
+    - Update availability settings (`PUT`, `PATCH`).
+    - Prevent unauthorized modifications to listings owned by other users.
+
+    Restrictions:
+    - Users can only view or modify availabilities associated with their own listings.
+    - Once an availability is created, its associated listing cannot be changed.
+    """
+
     queryset = Availability.objects.all()
     serializer_class = AvailabilitySerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Retrieve availabilities for the authenticated user's listings.
+
+        Returns:
+            QuerySet: Availability objects linked to the user's listings.
+        """
+        return Availability.objects.filter(listing__user_profile__user=self.request.user)
+    
+    def create(self, request):
+        """
+        Create an availability entry for a listing owned by the authenticated user.
+
+        Raises:
+            HTTP_400_BAD_REQUEST: If no listing ID is provided.
+            HTTP_404_NOT_FOUND: If the listing does not exist.
+            HTTP_403_FORBIDDEN: If the user does not own the listing.
+
+        Args:
+            request (Request): The HTTP request containing availability data.
+
+        Returns:
+            Response: Created availability data or an error message.
+        """
+
+        listing_id = request.data.get('listing')
+        if not listing_id:
+            return Response(
+                {'error': 'Listing is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            listing_obj = Listing.objects.get(
+                id=listing_id,
+                user_profile__user=request.user
+            )
+        except Listing.DoesNotExist:
+            return Response(
+                {'error': 'Listing does not exist.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        if listing_obj.user_profile.user != request.user:
+            return Response(
+                {"error": "You are not authorized to create availability for this listing."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(listing=listing_obj)
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+
+    def update(self, request, *args, **kwargs):
+        """
+        Update an existing availability entry.
+
+        Restrictions:
+        - Users can only update availability settings for their own listings.
+        - The linked listing cannot be changed after creation.
+
+        Raises:
+            HTTP_403_FORBIDDEN: If the user does not own the listing.
+            HTTP_400_BAD_REQUEST: If an attempt is made to change the linked listing.
+
+        Args:
+            request (Request): The HTTP request containing update data.
+
+        Returns:
+            Response: Updated availability data or an error message.
+        """
+        availability = self.get_object()
+
+        if availability.listing.user_profile.user != request.user:
+            return Response(
+                {"error": "You are not authorized to update this availability."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if 'listing' in request.data and str(request.data['listing']) != str(availability.listing.id):
+            return Response(
+                {'error': 'Listing cannot be changed.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().update(request, *args, **kwargs)

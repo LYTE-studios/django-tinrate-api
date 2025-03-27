@@ -6,6 +6,7 @@ from django.db.models import Count, Avg
 from users.models.profile_models import UserProfile, Experience
 from listings.models.listings_models import Listing, Day, Availability, Meeting
 from listings.utils.listings_utils import minutes_to_hours
+from django.utils import timezone
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -141,12 +142,73 @@ class ListingSerializer(serializers.ModelSerializer):
     
 
 class DaySerializer(serializers.ModelSerializer):
+    """
+    Serializer for the Day model.
+
+    This serializer handles:
+    - Retrieving and updating the availability of a specific day.
+    - Ensuring that time constraints are met when a day is marked as available.
+
+    Fields:
+        - id (int, read-only): Unique identifier for the day.
+        - day_of_week (str, read-only): The name of the day (Monday, Tuesday, etc.).
+        - is_available (bool): Whether the expert is available on this day.
+        - start_time (time, optional): The start time of availability (if applicable).
+        - end_time (time, optional): The end time of availability (if applicable).
+
+    Validation:
+        - If `is_available` is `True`, both `start_time` and `end_time` must be provided.
+        - `start_time` must be earlier than `end_time`.
+    """
+
     class Meta:
         model = Day
         fields = ['id', 'day_of_week', 'is_available', 'start_time', 'end_time']
+        read_only_fields = ['id', 'day_of_week']
+
+    def validate(self, data):
+        """
+        Validate the time constraints when a day is marked as available.
+
+        Raises:
+            serializers.ValidationError: If `start_time` and `end_time` are missing 
+            when `is_available` is `True`, or if `start_time` is later than `end_time`.
+        """
+        is_available = data.get('is_available', False)
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+
+        if is_available:
+            if not start_time or not end_time:
+                raise serializers.ValidationError({
+                    'time':'Both start_time and end_time are required when availability is True'
+                })
+            if start_time >= end_time:
+                raise serializers.ValidationError({
+                    'time':'Start time must be before end time.'
+                })
+        return data
 
 
 class AvailabilitySerializer(serializers.ModelSerializer):
+    """
+    Serializer for the Availability model.
+
+    This serializer is responsible for:
+    - Handling the validation and creation of availability entries.
+    - Ensuring that at least one day of the week has availability set to True.
+    - Preventing duplicate availability entries for the same listing.
+
+    Fields:
+        - id (int, read-only): Unique identifier for the availability record.
+        - listing (ForeignKey, read-only): The listing associated with this availability.
+        - monday-sunday (nested `DaySerializer`): Availability data for each day of the week.
+
+    Methods:
+        - validate: Ensures at least one day is marked as available.
+        - validate_listing: Ensures no duplicate availability exists for the listing.
+    """
+    
     monday = DaySerializer(required=False)
     tuesday = DaySerializer(required=False)
     wednesday = DaySerializer(required=False)
@@ -158,3 +220,54 @@ class AvailabilitySerializer(serializers.ModelSerializer):
     class Meta:
         model = Availability
         fields = ['id', 'listing', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        read_only_fields = ['id', 'listing']
+
+    def validate(self, data):
+        """
+        Validates the availability data to ensure that at least one day is available.
+
+        If no days are marked as available (i.e., no day has `is_available` set to True),
+        a validation error is raised.
+
+        Args:
+            data (dict): The incoming validated data for the Availability model.
+
+        Raises:
+            serializers.ValidationError: If no day is marked as available.
+        """
+
+        available_days = [
+            'monday', 'tuesday', 'wednesday', 
+            'thursday', 'friday', 'saturday', 'sunday'
+        ]
+
+        days_with_availability = [
+            day for day in available_days
+            if data.get(day) and data[day].get('is_available', False)
+        ]
+
+        if not days_with_availability:
+            raise serializers.ValidationError({
+                'availability':'At least one day must be available.'
+            })
+        
+    
+    def validate_listing(self, listing):
+        """
+        Validates that there is no existing availability entry for the provided listing.
+
+        If an availability entry already exists for the listing, a validation error is raised.
+
+        Args:
+            listing (Listing): The listing object for which availability is being created.
+
+        Raises:
+            serializers.ValidationError: If an availability entry already exists for the listing.
+        """
+
+        existing_availabilities = Availability.objects.filter(listing=listing)
+        if existing_availabilities.exists():
+            raise serializers.ValidationError(
+                'An availability entry already exists for this listing.'
+            )
+        return listing
