@@ -37,13 +37,11 @@ class ListingSerializer(serializers.ModelSerializer):
     total_reviews = serializers.SerializerMethodField()
     total_hours = serializers.SerializerMethodField()
     availability = serializers.JSONField()  
-    availabilities = AvailabilitySerializer(many=True, read_only=True) 
-    
 
     class Meta:
         model = Listing
         fields = ['id', 'first_name', 'last_name', 'country', 'profile_picture', 'job_title', 'company_name', 
-          'experience_name', 'pricing_per_hour', 'service_description', 'availability', 'availabilities', 'completion_status', 
+          'experience_name', 'pricing_per_hour', 'service_description', 'availability', 'completion_status', 
           'rating', 'total_reviews', 'total_hours', 'user_profile']
 
         read_only_fields = ['first_name', 'last_name', 'country', 'profile_picture', 'job_title', 'company_name', 

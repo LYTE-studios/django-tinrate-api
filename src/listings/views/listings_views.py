@@ -5,9 +5,13 @@ from listings.serializers.listings_serializers import ListingSerializer, DaySeri
 from listings.models.listings_models import Listing, Day, Availability, Meeting
 from users.models.profile_models import UserProfile
 from django.shortcuts import get_object_or_404
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, MethodNotAllowed
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.db import models
 from django.db.models import Q
+from listings.permissions import ReadOnlyOrAuthenticatedEdit
+
+
 
 class ListingViewSet(viewsets.ModelViewSet):
     """
@@ -196,7 +200,7 @@ class DayViewSet(viewsets.ModelViewSet):
     
     queryset = Day.objects.all()
     serializer_class = DaySerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ReadOnlyOrAuthenticatedEdit]
 
     def get_queryset(self):
         """
@@ -205,8 +209,42 @@ class DayViewSet(viewsets.ModelViewSet):
         Returns:
             QuerySet: Days related to the authenticated user's availabilities.
         """
-        return Day.objects.filter(availability__listing__user_profile__user=self.request.user)
+        listing_id = self.request.query_params.get('listing', None)
+
+        if not listing_id:
+            return Day.objects.none()
+        
+        try:
+            listing = Listing.objects.get(
+                id=listing_id, 
+            )
+            
+            availability = listing.availability
+            
     
+            available_days = []
+            day_fields = [
+                'monday', 'tuesday', 'wednesday', 'thursday', 
+                'friday', 'saturday', 'sunday'
+            ]
+            
+            for day_field in day_fields:
+                day = getattr(availability, day_field, None)
+                if day and day.is_available:
+                    available_days.append(day)
+            
+            return Day.objects.filter(id__in=[day.id for day in available_days])
+        
+        except Listing.DoesNotExist:
+            return Day.objects.none()
+        
+    def partial_update(self, request, *args, **kwargs):
+        """
+        Override the default partial update behavior.
+        """
+        return super().partial_update(request, *args, **kwargs)
+
+
     def perform_update(self, serializer):
         """
         Toggle the availability status for an existing day.
@@ -221,9 +259,33 @@ class DayViewSet(viewsets.ModelViewSet):
             Day: The updated day instance.
         """
         day = self.get_object()
-        if day.availability.listing.user_profile.user != self.request.user:
-            raise PermissionDenied("You cannot modify availability days that do not belong to you.")
+
+        availability = Availability.objects.filter(
+            models.Q(monday=day) | models.Q(tuesday=day) |
+            models.Q(wednesday=day) | models.Q(thursday=day) |
+            models.Q(friday=day) | models.Q(saturday=day) |
+            models.Q(sunday=day)
+        ).first() 
+
+
+        if not availability or not availability.listing:
+            raise PermissionDenied("This day is not associated with any listing.")
+
+        listing_owner = availability.listing.user_profile.user
+
+        if self.request.user != listing_owner:
+            raise PermissionDenied("You do not have permission to update this day.")
+
         serializer.save()
+            
+
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+    def create(self, request, *args, **kwargs):
+        """ Prevent users from creating new Day instances manually. """
+        raise MethodNotAllowed("POST method is not allowed for this endpoint.")
 
 
 class AvailabilityViewSet(viewsets.ModelViewSet):
@@ -252,6 +314,20 @@ class AvailabilityViewSet(viewsets.ModelViewSet):
         Returns:
             QuerySet: Availability objects linked to the user's listings.
         """
+        listing_id=self.request.query_params.get('listing', None)
+
+        if listing_id:
+            try:
+                Listing.objects.get(
+                    id=listing_id,
+                    user_profile__user=self.request.user
+                )
+                return Availability.objects.filter(
+                    listing_id=listing_id
+                )
+            except Listing.DoesNotExist:
+                return Availability.objects.none()
+        
         return Availability.objects.filter(listing__user_profile__user=self.request.user)
     
     def create(self, request):
