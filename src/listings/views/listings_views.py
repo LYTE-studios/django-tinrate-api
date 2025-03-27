@@ -1,8 +1,8 @@
 from rest_framework import viewsets, permissions, serializers
 from rest_framework.response import Response
 from rest_framework import status
-from listings.serializers.listings_serializers import ListingSerializer
-from listings.models.listings_models import Listing
+from listings.serializers.listings_serializers import ListingSerializer, DaySerializer, AvailabilitySerializer
+from listings.models.listings_models import Listing, Day, Availability, Meeting
 from users.models.profile_models import UserProfile
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
@@ -177,3 +177,16 @@ class ListingViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
+    
+
+
+class DayViewSet(viewsets.ModelViewSet):
+    queryset = Day.objects.all()
+    serializer_class = DaySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class AvailabilityViewSet(viewsets.ModelViewSet):
+    queryset = Availability.objects.all()
+    serializer_class = AvailabilitySerializer
+    permission_classes = [permissions.IsAuthenticated]

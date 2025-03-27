@@ -1,9 +1,10 @@
+from calendar import Day
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Count, Avg
 from users.models.profile_models import UserProfile, Experience
-from listings.models.listings_models import Listing
+from listings.models.listings_models import Listing, Day, Availability, Meeting
 from listings.utils.listings_utils import minutes_to_hours
 
 
@@ -34,11 +35,14 @@ class ListingSerializer(serializers.ModelSerializer):
     
     total_reviews = serializers.SerializerMethodField()
     total_hours = serializers.SerializerMethodField()
+    availability = serializers.JSONField()  
+    availabilities = AvailabilitySerializer(many=True, read_only=True) 
+    
 
     class Meta:
         model = Listing
         fields = ['id', 'first_name', 'last_name', 'country', 'profile_picture', 'job_title', 'company_name', 
-          'experience_name', 'pricing_per_hour', 'service_description', 'availability', 'completion_status', 
+          'experience_name', 'pricing_per_hour', 'service_description', 'availability', 'availabilities', 'completion_status', 
           'rating', 'total_reviews', 'total_hours', 'user_profile']
 
         read_only_fields = ['first_name', 'last_name', 'country', 'profile_picture', 'job_title', 'company_name', 
@@ -135,3 +139,22 @@ class ListingSerializer(serializers.ModelSerializer):
         """
         return minutes_to_hours(obj.user_profile.total_minutes) if obj.user_profile else None
     
+
+class DaySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Day
+        fields = ['id', 'day_of_week', 'is_available', 'start_time', 'end_time']
+
+
+class AvailabilitySerializer(serializers.ModelSerializer):
+    monday = DaySerializer(required=False)
+    tuesday = DaySerializer(required=False)
+    wednesday = DaySerializer(required=False)
+    thursday = DaySerializer(required=False)
+    friday = DaySerializer(required=False)
+    saturday = DaySerializer(required=False)
+    sunday = DaySerializer(required=False)
+
+    class Meta:
+        model = Availability
+        fields = ['id', 'listing', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
