@@ -11,5 +11,5 @@ router.register(r'availabilities', AvailabilityViewSet, basename='availabilities
 router.register(r'days', DayViewSet, basename='days')
 
 urlpatterns = [
-    
+
 ] + router.urls

@@ -5,7 +5,7 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
 from users.models.profile_models import UserProfile, Experience
-from listings.models.listings_models import Listing
+from listings.models.listings_models import Listing, Availability, Day
 from listings.serializers.listings_serializers import ListingSerializer
 
 class ListingViewSetTest(TestCase):
@@ -194,3 +194,130 @@ class ListingViewSetTest(TestCase):
 
 
 
+class DayViewSetTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='existinguser',
+            email='existinguser@example.com',
+            first_name='John',
+            last_name='Doe'
+        )
+        self.user_profile = UserProfile.objects.create(
+            user=self.user,
+            country='USA',
+            job_title='Designer',
+            company_name='TechCorp',
+            profile_picture=None,
+        )
+        self.user2 = User.objects.create_user(
+            username='user2',
+            email='user2@example.com',
+            first_name='Jane',
+            last_name='Doe'
+        )
+        self.user_profile2 = UserProfile.objects.create(
+            user=self.user2,
+            country='USA',
+            job_title='Designer',
+            company_name='TechCorp',
+            profile_picture=None,
+        )
+        self.monday = Day.objects.create(
+            day_of_week='monday',
+            is_available=True,
+            start_time='09.00',
+            end_time='17.00',
+        )
+        self.tuesday = Day.objects.create(
+            day_of_week='tuesday',
+            is_available=True,
+            start_time='12.00',
+            end_time='20.00',
+        )
+        self.availability = Availability.objects.create(
+            monday=self.monday,
+            tuesday=self.tuesday
+        )
+
+        self.listing = Listing.objects.create(
+            user_profile=self.user_profile,
+            pricing_per_hour=50.0,
+            service_description ='Talk about web designing.',
+            completion_status=True,
+            availability=self.availability
+        )
+
+        self.url = reverse('days-list')
+        self.url_detail= reverse('days-detail', args=[self.listing.pk])
+
+    
+    def test_get_days_for_own_listing(self):
+        """Test that a user can retrieve days for their listing."""
+        self.client.force_authenticate(self.user)
+        response = self.client.get(f"{self.url}?listing={self.listing.id}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]['day_of_week'], 'monday')
+        self.assertEqual(self.monday.start_time, '09.00')
+        self.assertEqual(self.monday.end_time, '17.00')
+
+
+    def test_get_days_other_users_listing(self):
+        """Test that another user can retrieve another user listing availability days."""
+        self.client.force_authenticate(self.user2)
+        response = self.client.get(f"{self.url}?listing={self.listing.id}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+    
+    def test_update_own_day_availability(self):
+        """Test that a user can update the day availabilities of their listing."""
+        self.client.force_authenticate(self.user)
+        updated_data={
+            'day_of_week':'monday',
+            'is_available':True,
+            'start_time':'09.00',
+            'end_time':'18.00',
+        }
+        response = self.client.patch(f"{self.url_detail}?listing={self.listing.id}", updated_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.monday.refresh_from_db()
+        self.assertEqual(self.monday.start_time.strftime('%H:%M'), '09:00')
+        self.assertEqual(self.monday.end_time.strftime('%H:%M'), '18:00')
+
+    def test_cannot_update_other_users_day(self):
+        """Test that a user cannot update a day for another user's lising."""
+        self.client.force_authenticate(self.user2)
+        updated_data={
+            'day_of_week':'monday',
+            'is_available':True,
+            'start_time':'09.00',
+            'end_time':'18.00',
+        }
+        response = self.client.patch(f"{self.url_detail}?listing={self.listing.id}", updated_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_cannot_create_new_day(self):
+        """Test that users cannot manually create new days."""
+        self.client.force_authenticate(self.user)
+        create_data = {
+            'day_of_week':'monday',
+            'is_available':True,
+            'start_time':'09.00',
+            'end_time':'18.00',
+        }
+        response = self.client.post(self.url, create_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_cannot_delete_day(self):
+        """Test users cannot delete existing days."""
+        self.client.force_authenticate(self.user)
+        response = self.client.delete(self.url)
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_unauthenticated_access_success(self):
+        """Test that unauthenticated users can access to the days availability."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+   
