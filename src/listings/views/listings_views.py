@@ -6,6 +6,7 @@ from listings.models.listings_models import Listing
 from users.models.profile_models import UserProfile
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Q
 
 class ListingViewSet(viewsets.ModelViewSet):
@@ -18,7 +19,11 @@ class ListingViewSet(viewsets.ModelViewSet):
         Only authenticated users can access this viewset.
     """
     serializer_class = ListingSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:  # Allow unauthenticated for GET actions
+            return [AllowAny()]
+        return [IsAuthenticated()]  
 
     def get_queryset(self):
         """
@@ -29,6 +34,9 @@ class ListingViewSet(viewsets.ModelViewSet):
         Returns:
             queryset (QuerySet): Filtered listings visible to the current user.
         """
+        user = self.request.user
+        if not user.is_authenticated:
+            return Listing.objects.filter(completion_status=True)
 
         user = self.request.user
         return Listing.objects.filter(Q(completion_status=True) | Q(user_profile__user=user))
@@ -44,9 +52,10 @@ class ListingViewSet(viewsets.ModelViewSet):
             PermissionDenied: If the user doesn't have access to the listing
             Http404: If the listing doesn't exist
         """
-        # Retrieve the listing
-        queryset = self.get_queryset()
-        obj = get_object_or_404(self.get_queryset(), pk=self.kwargs['pk'])
+        obj = get_object_or_404(Listing, pk=self.kwargs['pk'])
+
+        if obj.completion_status:
+            return obj
         
         # Check if the current user owns the listing
         if obj.user_profile.user != self.request.user:
@@ -122,6 +131,9 @@ class ListingViewSet(viewsets.ModelViewSet):
         """
         
         instance = self.get_object()
+
+        if instance.user_profile.user != request.user:
+            raise PermissionDenied("You do not have permission to delete this listing.")
 
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
