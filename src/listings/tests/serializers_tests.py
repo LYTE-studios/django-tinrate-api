@@ -58,7 +58,7 @@ class ListingSerializerTest(TestCase):
             comment='Great service!'
         )
         self.url = reverse('listings-list')
-        self.url_detail= reverse('listings-detail', args=[self.listing.pk]) + '.json'
+        self.url_detail= reverse('listings-detail', args=[self.listing.pk])
         self.client.force_authenticate(self.user)
 
     def test_total_reviews_calculation(self):
@@ -110,3 +110,19 @@ class ListingSerializerTest(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         listing = Listing.objects.get(id=self.listing.id)
         self.assertTrue(listing.completion_status)
+
+
+    def test_listing_view_get_total_reviews(self):
+        """Test the listing view returns the correct total_reviews field."""
+        response = self.client.get(self.url_detail)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['total_reviews'], 2)
+
+    def test_create_listing_invalid_data(self):
+        """Test creating a listing with missing required fields."""
+        data = {
+            'pricing_per_hour':60.0
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('availability', response.data)
