@@ -220,6 +220,99 @@ class AvailabilitySerializer(serializers.ModelSerializer):
         fields = ['id', 'listing', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
         read_only_fields = ['id', 'listing']
 
+    def validate_listing(self, listing):
+        """
+        Validates that there is no existing availability entry for the provided listing.
+
+        If an availability entry already exists for the listing, a validation error is raised.
+
+        Args:
+            listing (Listing): The listing object for which availability is being created.
+
+        Raises:
+            serializers.ValidationError: If an availability entry already exists for the listing.
+        """
+
+        existing_availabilities = Availability.objects.filter(listing=listing)
+        if existing_availabilities.exists():
+            raise serializers.ValidationError(
+                'An availability entry already exists for this listing.'
+            )
+        return listing
+
+
+    def create(self, validated_data):
+        """
+        Create a new Availability instance and associated Day instances.
+
+        This method creates an Availability object from the provided validated data.
+        It then iterates over each day of the week ('monday' through 'sunday') and 
+        creates a Day object for each day where data is provided. Each Day is linked
+        to the created Availability object.
+
+        Args:
+            validated_data (dict): The validated data passed to the serializer,
+                                    including fields for the availability as well
+                                    as any day-specific data (e.g., 'monday', 'tuesday', etc.).
+
+        Returns:
+            Availability: The newly created Availability instance.
+        """
+        day_fields = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        days_data = {field: validated_data.pop(field, None) for field in day_fields}
+        
+    
+        availability = Availability.objects.create(**validated_data)
+        
+
+        for day_name, day_data in days_data.items():
+            if day_data:
+                day_data['day_of_week'] = day_name
+                Day.objects.create(availability=availability, **day_data)
+        
+        return availability
+    
+    def update(self, instance, validated_data):
+        """
+        Update an existing Availability instance and its associated Day instances.
+
+        This method updates the fields of an existing Availability object with the
+        provided validated data. It also updates or creates Day objects for each
+        day of the week ('monday' through 'sunday') if corresponding data is provided.
+        Each updated or newly created Day object is linked to the updated Availability
+        instance.
+
+        Args:
+            instance (Availability): The existing Availability instance to update.
+            validated_data (dict): The validated data passed to the serializer,
+                                    which may include fields for the availability and
+                                    data for specific days of the week.
+
+        Returns:
+            Availability: The updated Availability instance.
+        """
+        day_fields = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        days_data = {field: validated_data.pop(field, None) for field in day_fields}
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        for day_name, day_data in days_data.items():
+            if day_data:
+                # Remove the 'availability=instance' parameter
+                day_obj, created = Day.objects.get_or_create(day_of_week=day_name)
+                
+                # Link the day to the availability instance if needed
+                day_obj.availability = instance
+                
+                for key, value in day_data.items():
+                    setattr(day_obj, key, value)
+                day_obj.save()
+        
+        return instance
+
+    
     def validate(self, data):
         """
         Validates the availability data to ensure that at least one day is available.
@@ -248,24 +341,6 @@ class AvailabilitySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'availability':'At least one day must be available.'
             })
-        
+        return data
     
-    def validate_listing(self, listing):
-        """
-        Validates that there is no existing availability entry for the provided listing.
-
-        If an availability entry already exists for the listing, a validation error is raised.
-
-        Args:
-            listing (Listing): The listing object for which availability is being created.
-
-        Raises:
-            serializers.ValidationError: If an availability entry already exists for the listing.
-        """
-
-        existing_availabilities = Availability.objects.filter(listing=listing)
-        if existing_availabilities.exists():
-            raise serializers.ValidationError(
-                'An availability entry already exists for this listing.'
-            )
-        return listing
+    

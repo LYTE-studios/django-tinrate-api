@@ -305,7 +305,7 @@ class AvailabilityViewSet(viewsets.ModelViewSet):
 
     queryset = Availability.objects.all()
     serializer_class = AvailabilitySerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [ReadOnlyOrAuthenticatedEdit]
 
     def get_queryset(self):
         """
@@ -317,17 +317,15 @@ class AvailabilityViewSet(viewsets.ModelViewSet):
         listing_id=self.request.query_params.get('listing', None)
 
         if listing_id:
-            try:
-                Listing.objects.get(
-                    id=listing_id,
-                    user_profile__user=self.request.user
-                )
-                return Availability.objects.filter(
-                    listing_id=listing_id
-                )
-            except Listing.DoesNotExist:
-                return Availability.objects.none()
-        
+            if listing_id:
+                return Availability.objects.filter(listing__id=listing_id)
+
+            if self.request.user.is_authenticated:
+                return Availability.objects.filter(listing__user_profile__user=self.request.user)
+            
+            return Availability.objects.none() 
+            
+               
         return Availability.objects.filter(listing__user_profile__user=self.request.user)
     
     def create(self, request):
@@ -364,6 +362,7 @@ class AvailabilityViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND
             )
         
+        
         if listing_obj.user_profile.user != request.user:
             return Response(
                 {"error": "You are not authorized to create availability for this listing."},
@@ -372,7 +371,15 @@ class AvailabilityViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        
+        if Availability.objects.filter(listing=listing_obj).exists():
+            return Response(
+                {"error": "Availability for this listing already exists."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
         serializer.save(listing=listing_obj)
+        self.perform_create(serializer)
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     

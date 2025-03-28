@@ -2,7 +2,7 @@ from django.test import TestCase
 from redis import ResponseError
 from users.models.user_models import User
 from django.urls import reverse
-from rest_framework.test import APIClient
+from rest_framework.test import APIClient, APITestCase
 from rest_framework import status
 from users.models.profile_models import UserProfile, Experience
 from listings.models.listings_models import Listing, Availability, Day
@@ -320,4 +320,121 @@ class DayViewSetTest(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-   
+
+class AvailabilityViewSetTest(APITestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='existinguser',
+            email='existinguser@example.com',
+            first_name='John',
+            last_name='Doe'
+        )
+        self.user_profile = UserProfile.objects.create(
+            user=self.user,
+            country='USA',
+            job_title='Designer',
+            company_name='TechCorp',
+            profile_picture=None,
+        )
+        self.user2 = User.objects.create_user(
+            username='user2',
+            email='user2@example.com',
+            first_name='Jane',
+            last_name='Doe'
+        )
+        self.user_profile2 = UserProfile.objects.create(
+            user=self.user2,
+            country='USA',
+            job_title='Designer',
+            company_name='TechCorp',
+            profile_picture=None,
+        )
+        self.monday = Day.objects.create(
+            day_of_week='monday',
+            is_available=True,
+            start_time='09.00',
+            end_time='17.00',
+        )
+        self.availability = Availability.objects.create(
+            monday=self.monday,
+        )
+        self.listing = Listing.objects.create(
+            user_profile=self.user_profile,
+            pricing_per_hour=50.0,
+            service_description ='Talk about web designing.',
+            completion_status=True,
+            availability=self.availability
+        )
+        self.url = reverse('availabilities-list')
+        self.url_detail= reverse('availabilities-detail', args=[self.listing.pk])
+
+    def test_get_queryset_with_own_listing(self):
+        """Test retrieving availabilities for user's own listing."""
+        self.client.force_authenticate(self.user)
+        response = self.client.get(f"{self.url}?listing={self.listing.id}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+    def test_get_queryset_unauthenticated(self):
+        """Test retrieving availabilities for when a user is not registered or authenticated."""
+        response = self.client.get(f"{self.url}?listing={self.listing.id}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+    def test_create_availability_duplicate(self):
+        """Test that one listing can only have one availability."""
+        self.client.force_authenticate(self.user)
+        data = {
+            'listing': self.listing.id,  
+            'monday': {'is_available': True, 'start_time': '09.00', 'end_time': '17.00'}
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Availability.objects.count(), 1)
+        self.assertEqual(response.data['error'], 'Availability for this listing already exists.')
+
+    def test_create_availability_without_listing(self):
+        """Test creating availability without a specific listing."""
+        self.client.force_authenticate(self.user)
+        data = {  
+            'monday': {'is_available': True, 'start_time': '09.00', 'end_time': '17.00'}
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['error'], 'Listing is required')
+
+    def test_create_availability_unauthorized_listing(self):
+        """Test creating availability for another user's listing."""
+        self.client.force_authenticate(self.user2)
+        data = {
+            'listing': self.listing.id,  
+            'monday': {'is_available': True, 'start_time': '09.00', 'end_time': '17.00'}
+        }
+        response = self.client.post(self.url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data['error'], 'Listing does not exist.')
+
+    def test_update_availability_success(self):
+        """Test updating the availability for own listing."""
+        self.client.force_authenticate(self.user)
+        updated_data={
+            'monday': {'is_available': True, 'start_time': '10.00', 'end_time': '17.00'}
+        }
+        response = self.client.patch(self.url_detail, updated_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.availability.refresh_from_db()
+        self.assertEqual(str(self.availability.monday.start_time), '10:00:00')
+
+    def test_update_availability_listing_forbidden(self):
+        """Test attempting to update another user's availability."""
+        self.client.force_authenticate(self.user2)
+        updated_data={
+            'monday': {'is_available': True, 'start_time': '10.00', 'end_time': '17.00'}
+        }
+        response = self.client.patch(self.url_detail, updated_data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.availability.refresh_from_db()
+        self.assertEqual(str(self.availability.monday.start_time), '09:00:00')
+
+    
