@@ -1,9 +1,10 @@
+from datetime import time
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 from users.models.profile_models import UserProfile, Review, Experience
-from listings.models.listings_models import Listing
-from listings.serializers.listings_serializers import ListingSerializer
+from listings.models.listings_models import Listing, Day, Availability
+from listings.serializers.listings_serializers import ListingSerializer, DaySerializer, AvailabilitySerializer
 from users.models.user_models import User
 from django.urls import reverse
 
@@ -126,3 +127,117 @@ class ListingSerializerTest(TestCase):
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('availability', response.data)
+
+
+class DaySerializerTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='existinguser',
+            email='existinguser@example.com',
+            first_name='John',
+            last_name='Doe'
+        )
+        self.experience = Experience.objects.create(name='Designer', weight=2)
+        self.user_profile = UserProfile.objects.create(
+            user=self.user,
+            country='USA',
+            job_title='Designer',
+            company_name='TechCorp',
+            profile_picture=None,
+        )
+        self.monday = Day.objects.create(
+            day_of_week='monday',
+            is_available=True,
+            start_time='09.00',
+            end_time='17.00',
+        )
+        self.tuesday = Day.objects.create(
+            day_of_week='tuesday',
+            is_available=True,
+            start_time='12.00',
+            end_time='20.00',
+        )
+        self.availability = Availability.objects.create(
+            monday=self.monday,
+            tuesday=self.tuesday
+        )
+        self.listing = Listing.objects.create(
+            user_profile=self.user_profile,
+            pricing_per_hour=50.0,
+            service_description ='Talk about web designing.',
+            availability=self.availability,
+            completion_status=False,
+            experience=self.experience
+        )
+    
+    def test_valid_serializer_data(self):
+        """Test serializer validation with valid data."""
+        serializer = DaySerializer(data={
+            'is_available':True,
+            'start_time':'09.00',
+            'end_time':'17.00',
+        })
+        self.assertTrue(serializer.is_valid(), f"Serializer error: {serializer.errors}")
+
+    def test_unavailable_day_validation(self):
+        """Test serializer validation for an unavailable day."""
+        serializer = DaySerializer(data={
+            'is_available':False,   
+        })
+        self.assertTrue(serializer.is_valid(), f"Serializer error: {serializer.errors}")
+
+    def test_missing_time_when_available(self):
+        """Test validation fail when time is missing for an available day."""
+        serializer = DaySerializer(data={
+            'is_available':True,   
+        })
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('time', serializer.errors)
+        self.assertEqual(serializer.errors['time'][0], 'Both start_time and end_time are required when availability is True')
+
+    def test_invalid_time_order(self):
+        """Test validation fail when start_time is later than or equal to end_time."""
+        serializer = DaySerializer(data={
+            'is_available':True,
+            'start_time':'14.00',
+            'end_time':'09.00',
+        })
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('time', serializer.errors)
+        self.assertEqual(serializer.errors['time'][0],'Start time must be before end time.')
+
+    def test_serializer_read_only_fields(self):
+        """Test that read-only fileds cannot be modified."""
+        original_day_of_week = self.monday.day_of_week
+        serializer = DaySerializer(self.monday, data={
+            'day_of_week':'Monday',
+            'is_available':False
+        }, partial=True)
+        self.assertTrue(serializer.is_valid())
+        updated_day = serializer.save()
+        self.assertEqual(updated_day.day_of_week, original_day_of_week)
+
+    def test_serializer_update(self):
+        """Test updating an existing Day instance."""
+        serializer = DaySerializer(self.monday, data={
+            'is_available':False,
+            'start_time': None,
+            'end_time':None,
+        }, partial=True)
+        self.assertTrue(serializer.is_valid(), f"Serializer errors:{serializer.errors}")
+        updated_day = serializer.save()
+        self.assertFalse(updated_day.is_available)
+        self.assertIsNone(updated_day.start_time)
+        self.assertIsNone(updated_day.end_time)
+
+    def test_serializer_representation(self):
+        """Test the serializer's data representation."""
+        serializer = DaySerializer(self.monday)
+        data = serializer.data
+        self.assertEqual(data['day_of_week'], 'monday')
+        self.assertEqual(data['is_available'], True)
+        self.assertEqual(data['start_time'],'09.00')
+        self.assertEqual(data['end_time'], '17.00')
+
+   
