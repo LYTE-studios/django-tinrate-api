@@ -241,3 +241,105 @@ class DaySerializerTest(TestCase):
         self.assertEqual(data['end_time'], '17.00')
 
    
+class AvailabilitySerializerTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username='existinguser',
+            email='existinguser@example.com',
+            first_name='John',
+            last_name='Doe'
+        )
+        self.experience = Experience.objects.create(name='Designer', weight=2)
+        self.user_profile = UserProfile.objects.create(
+            user=self.user,
+            country='USA',
+            job_title='Designer',
+            company_name='TechCorp',
+            profile_picture=None,
+        )
+        self.monday = Day.objects.create(
+            day_of_week='monday',
+            is_available=True,
+            start_time='09.00',
+            end_time='17.00',
+        )
+        self.tuesday = Day.objects.create(
+            day_of_week='tuesday',
+            is_available=True,
+            start_time='12.00',
+            end_time='20.00',
+        )
+        self.availability = Availability.objects.create(
+            monday=self.monday,
+            tuesday=self.tuesday,
+        )
+        self.listing = Listing.objects.create(
+            user_profile=self.user_profile,
+            pricing_per_hour=50.0,
+            service_description ='Talk about web designing.',
+            availability=self.availability,
+            completion_status=False,
+            experience=self.experience
+        )
+    
+    def test_create_availability_with_partial_week(self):
+        """Test creating an availability with only some days set."""
+        availability_data = {
+            'listing': self.listing,
+            'monday': {
+                'id': self.monday.id,
+                'day_of_week': self.monday.day_of_week,
+                'is_available': self.monday.is_available,
+                'start_time': self.monday.start_time,
+                'end_time': self.monday.end_time,
+            },
+            'tuesday': {
+                'id': self.tuesday.id,
+                'day_of_week': self.tuesday.day_of_week,
+                'is_available': self.tuesday.is_available,
+                'start_time': self.tuesday.start_time,
+                'end_time': self.tuesday.end_time,
+            },
+        }
+        serializer = AvailabilitySerializer(data=availability_data)
+        self.assertTrue(serializer.is_valid(), f"Serializer errors: {serializer.errors}")
+    
+    def test_create_no_availability(self):
+        """Test validation fail when no days are available."""
+        availability_data = {
+            'listing': self.listing,
+            'monday': {'is_available': False},
+            'tuesday': {'is_available': False},
+            'wednesday': {'is_available': False},
+            'thursday': {'is_available': False},
+            'friday': {'is_available': False},
+            'saturday': {'is_available': False},
+            'sunday': {'is_available': False}
+        }
+        serializer = AvailabilitySerializer(data=availability_data)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('availability', serializer.errors)
+        self.assertEqual(serializer.errors['availability'][0], 'At least one day must be available.')
+
+    def test_create_duplicate_availability_listing(self):
+        """Test that creating multiple availabilities for the same listing is prevented."""
+        self.availability = Availability.objects.create(
+            monday=self.monday,
+            tuesday=self.tuesday,
+        )
+        first_serializer = AvailabilitySerializer(data=self.availability)
+        self.assertFalse(first_serializer.is_valid())
+        
+    def test_update_availability(self):
+        """Test updating an existing availability."""
+        initial_data = {
+            'listing': self.listing.id,  
+            'monday': {'is_available': True, 'start_time': '09.00', 'end_time': '17.00'}
+        }
+        initial_serializer = AvailabilitySerializer(data=initial_data)
+        initial_serializer.is_valid()
+        availability = initial_serializer.save()
+        
+
+        

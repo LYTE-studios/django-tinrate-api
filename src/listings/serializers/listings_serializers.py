@@ -267,9 +267,17 @@ class AvailabilitySerializer(serializers.ModelSerializer):
 
         for day_name, day_data in days_data.items():
             if day_data:
-                day_data['day_of_week'] = day_name
-                Day.objects.create(availability=availability, **day_data)
-        
+                day_obj, _ = Day.objects.get_or_create(
+                    day_of_week=day_name,
+                    defaults={
+                        'is_available': day_data.get('is_available', False),
+                        'start_time': day_data.get('start_time'),
+                        'end_time': day_data.get('end_time')
+                    }
+                )
+                setattr(availability, day_name, day_obj)
+                
+        availability.save()
         return availability
     
     def update(self, instance, validated_data):
