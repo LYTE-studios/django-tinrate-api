@@ -107,7 +107,7 @@ class UserAPITestCase(APITestCase):
         """Test getting current user without authentication."""
         self.client.credentials()  # Remove authentication
         
-        response = self.client.get(self.get_user_url)
+        response = self.client.get(self.user_profile_url)
         
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
     
@@ -119,7 +119,7 @@ class UserAPITestCase(APITestCase):
             'country': 'CA'
         }
         
-        response = self.client.put(self.update_user_url, update_data)
+        response = self.client.put(self.user_profile_url, update_data)
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['success'])
@@ -139,7 +139,7 @@ class UserAPITestCase(APITestCase):
             'firstName': 'PartialUpdate'
         }
         
-        response = self.client.put(self.update_user_url, update_data)
+        response = self.client.put(self.user_profile_url, update_data)
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['success'])

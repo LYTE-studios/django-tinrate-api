@@ -213,7 +213,7 @@ class ExpertAPITestCase(APITestCase):
         self.list_experts_url = reverse('experts:list_experts')
         self.featured_experts_url = reverse('experts:featured_experts')
         self.expert_detail_url = reverse('experts:get_expert_by_profile_url', kwargs={'profile_url': 'expert-user'})
-        self.create_listing_url = reverse('experts:create_expert_listing')
+        self.expert_listing_url = reverse('experts:expert_listing')
         self.publish_listing_url = reverse('experts:publish_expert_listing')
         self.unpublish_listing_url = reverse('experts:unpublish_expert_listing')
     
@@ -304,7 +304,7 @@ class ExpertAPITestCase(APITestCase):
             'profileUrl': 'new-expert'
         }
         
-        response = self.client.post(self.create_listing_url, listing_data)
+        response = self.client.post(self.expert_listing_url, listing_data)
         
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertTrue(response.data['success'])
@@ -325,7 +325,7 @@ class ExpertAPITestCase(APITestCase):
             'profileUrl': 'new-expert'
         }
         
-        response = self.client.post(self.create_listing_url, listing_data)
+        response = self.client.post(self.expert_listing_url, listing_data)
         
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
     
@@ -344,7 +344,7 @@ class ExpertAPITestCase(APITestCase):
             'profileUrl': 'expert-user'
         }
         
-        response = self.client.post(self.create_listing_url, update_data)
+        response = self.client.post(self.expert_listing_url, update_data)
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['success'])
