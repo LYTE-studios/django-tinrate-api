@@ -1,6 +1,0 @@
-from .payments_release_views import ReleasePaymentView
-from .payments_cancel_views import ChargeCancellationFeeView
-from .payments_capture_views import CapturePaymentView
-from .payments_intent_views import CreatePaymentIntentView
-from .payments_refund_views import RefundPaymentView
-from .payments_fail_views import FailPaymentsView

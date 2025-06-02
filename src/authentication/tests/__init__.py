@@ -1,2 +1,0 @@
-from .views_tests import RegisterViewTest
-from .serializers_tests import RegisterSerializerTest, LoginSerializerTest
