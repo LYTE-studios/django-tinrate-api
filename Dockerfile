@@ -1,9 +1,9 @@
 FROM python:3.11-slim
 
 # Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-ENV DEBIAN_FRONTEND noninteractive
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Set work directory
 WORKDIR /app
@@ -16,28 +16,35 @@ RUN apt-get update \
         netcat-openbsd \
         curl \
         git \
+        postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir \
-        watchdog[watchmedo] \
-        stripe \
-        whitenoise \
-        psycopg2-binary \
-        python-dotenv \
-        gunicorn
+        gunicorn \
+        whitenoise
 
-# Copy entrypoint script first and make it executable
-COPY entrypoint.sh .
+# Copy entrypoint script and make it executable
+COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Copy project
+# Copy project files
 COPY . /app/
 
-# Create directories and set permissions
+# Create necessary directories
+RUN mkdir -p /app/staticfiles /app/media
+
+# Set permissions
 RUN chmod +x /app/entrypoint.sh
 
-# Run entrypoint.sh
+# Expose port
+EXPOSE 8000
+
+# Set entrypoint
 ENTRYPOINT ["/app/entrypoint.sh"]
+
+# Default command
+CMD ["gunicorn", "--workers", "3", "--bind", "0.0.0.0:8000", "tinrate_api.wsgi:application"]
