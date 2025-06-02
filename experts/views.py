@@ -108,7 +108,7 @@ def featured_experts(request):
     experts = Expert.objects.filter(
         is_listed=True,
         is_featured=True
-    ).order_by('-rating', '-review_count')[:6]  # Limit to 6 featured experts
+    ).order_by('-created_at')[:6]  # Limit to 6 featured experts
     
     serializer = ExpertListSerializer(experts, many=True)
     
@@ -161,41 +161,55 @@ def get_expert_by_profile_url(request, profile_url):
     return success_response(response_data)
 
 
-@api_view(['POST'])
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
-def create_expert_listing(request):
+def expert_listing(request):
     """
-    Create or update expert listing.
+    Get or create/update expert listing.
     """
     user = request.user
     
-    # Check if user already has an expert profile
-    try:
+    if request.method == 'GET':
+        if not hasattr(user, 'expert_profile'):
+            return error_response(
+                "Expert profile not found",
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+        
         expert = user.expert_profile
-        serializer = ExpertCreateUpdateSerializer(expert, data=request.data, partial=True)
-    except Expert.DoesNotExist:
-        serializer = ExpertCreateUpdateSerializer(data=request.data)
-    
-    if serializer.is_valid():
-        if hasattr(user, 'expert_profile'):
-            expert = serializer.save()
-        else:
-            expert = serializer.save(user=user)
-            user.is_expert = True
-            user.save()
-        
-        response_serializer = ExpertDetailSerializer(expert)
-        status_code = status.HTTP_200_OK if hasattr(user, 'expert_profile') else status.HTTP_201_CREATED
-        
+        serializer = ExpertDetailSerializer(expert)
         return success_response({
-            'expert': response_serializer.data
-        }, status_code=status_code)
+            'expert': serializer.data
+        })
     
-    return error_response(
-        "Expert listing creation failed",
-        details=serializer.errors,
-        status_code=status.HTTP_400_BAD_REQUEST
-    )
+    elif request.method == 'POST':
+        # Check if user already has an expert profile
+        try:
+            expert = user.expert_profile
+            serializer = ExpertCreateUpdateSerializer(expert, data=request.data, partial=True)
+        except Expert.DoesNotExist:
+            serializer = ExpertCreateUpdateSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            if hasattr(user, 'expert_profile'):
+                expert = serializer.save()
+            else:
+                expert = serializer.save(user=user)
+                user.is_expert = True
+                user.save()
+            
+            response_serializer = ExpertDetailSerializer(expert)
+            status_code = status.HTTP_200_OK if hasattr(user, 'expert_profile') else status.HTTP_201_CREATED
+            
+            return success_response({
+                'expert': response_serializer.data
+            }, status_code=status_code)
+        
+        return error_response(
+            "Expert listing creation failed",
+            details=serializer.errors,
+            status_code=status.HTTP_400_BAD_REQUEST
+        )
 
 
 @api_view(['PUT'])

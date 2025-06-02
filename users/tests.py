@@ -90,14 +90,13 @@ class UserAPITestCase(APITestCase):
         refresh = RefreshToken.for_user(self.user)
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {refresh.access_token}')
         
-        self.get_user_url = reverse('users:get_current_user')
-        self.update_user_url = reverse('users:update_current_user')
+        self.user_profile_url = reverse('users:user_profile')
         self.complete_profile_url = reverse('users:complete_profile')
         self.user_stats_url = reverse('users:get_user_stats')
     
     def test_get_current_user(self):
         """Test getting current user profile."""
-        response = self.client.get(self.get_user_url)
+        response = self.client.get(self.user_profile_url)
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['success'])

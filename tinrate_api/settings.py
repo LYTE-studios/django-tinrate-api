@@ -147,7 +147,44 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = "static/"
+import os
+
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, "static"),
+]
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = '/media/'
+
+# AWS S3 Configuration
+AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='')
+AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='eu-central-1')
+AWS_S3_FILE_OVERWRITE = False
+AWS_S3_VERIFY = True
+AWS_S3_ADDRESSING_STYLE = "virtual"
+AWS_DEFAULT_ACL = "public-read"
+STORAGES_DEBUG = True
+
+# Use AWS S3 for static and media files if bucket is configured
+if AWS_STORAGE_BUCKET_NAME:
+    # Add storages to installed apps
+    if 'storages' not in INSTALLED_APPS:
+        INSTALLED_APPS.append('storages')
+    
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        },
+        "staticfiles": {
+            "BACKEND": "storages.backends.s3boto3.S3StaticStorage",
+        },
+    }
+    
+    AWS_QUERYSTRING_AUTH = False
+    AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
+    STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/static/"
+    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/media/"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

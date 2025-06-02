@@ -14,52 +14,46 @@ from .serializers import (
 User = get_user_model()
 
 
-@api_view(['GET'])
+@api_view(['GET', 'PUT'])
 @permission_classes([IsAuthenticated])
-def get_current_user(request):
+def user_profile(request):
     """
-    Get current user's profile information.
+    Get or update current user's profile information.
     """
     user = request.user
     
-    # Use different serializer based on whether user is an expert
-    if user.is_expert and hasattr(user, 'expert_profile'):
-        serializer = UserWithExpertProfileSerializer(user)
-    else:
-        serializer = UserSerializer(user)
-    
-    return success_response({
-        'user': serializer.data
-    })
-
-
-@api_view(['PUT'])
-@permission_classes([IsAuthenticated])
-def update_current_user(request):
-    """
-    Update current user's profile.
-    """
-    user = request.user
-    serializer = UserSerializer(user, data=request.data, partial=True)
-    
-    if serializer.is_valid():
-        updated_user = serializer.save()
-        
-        # Use appropriate serializer for response
-        if updated_user.is_expert and hasattr(updated_user, 'expert_profile'):
-            response_serializer = UserWithExpertProfileSerializer(updated_user)
+    if request.method == 'GET':
+        # Use different serializer based on whether user is an expert
+        if user.is_expert and hasattr(user, 'expert_profile'):
+            serializer = UserWithExpertProfileSerializer(user)
         else:
-            response_serializer = UserSerializer(updated_user)
+            serializer = UserSerializer(user)
         
         return success_response({
-            'user': response_serializer.data
+            'user': serializer.data
         })
     
-    return error_response(
-        "Profile update failed",
-        details=serializer.errors,
-        status_code=status.HTTP_400_BAD_REQUEST
-    )
+    elif request.method == 'PUT':
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        
+        if serializer.is_valid():
+            updated_user = serializer.save()
+            
+            # Use appropriate serializer for response
+            if updated_user.is_expert and hasattr(updated_user, 'expert_profile'):
+                response_serializer = UserWithExpertProfileSerializer(updated_user)
+            else:
+                response_serializer = UserSerializer(updated_user)
+            
+            return success_response({
+                'user': response_serializer.data
+            })
+        
+        return error_response(
+            "Profile update failed",
+            details=serializer.errors,
+            status_code=status.HTTP_400_BAD_REQUEST
+        )
 
 
 @api_view(['POST'])

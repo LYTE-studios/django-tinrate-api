@@ -5,8 +5,7 @@ app_name = 'users'
 
 urlpatterns = [
     # User profile endpoints
-    path('me/', views.get_current_user, name='get_current_user'),
-    path('me/', views.update_current_user, name='update_current_user'),
+    path('me/', views.user_profile, name='user_profile'),
     path('me/complete-profile/', views.complete_profile, name='complete_profile'),
     path('me/stats/', views.get_user_stats, name='get_user_stats'),
     path('me/activity/', views.get_user_activity, name='get_user_activity'),

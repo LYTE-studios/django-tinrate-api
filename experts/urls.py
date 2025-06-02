@@ -10,7 +10,7 @@ urlpatterns = [
     path('<str:profile_url>/', views.get_expert_by_profile_url, name='get_expert_by_profile_url'),
     
     # Expert profile management
-    path('me/listing/', views.create_expert_listing, name='create_expert_listing'),
+    path('me/listing/', views.expert_listing, name='expert_listing'),
     path('me/listing/publish/', views.publish_expert_listing, name='publish_expert_listing'),
     path('me/listing/unpublish/', views.unpublish_expert_listing, name='unpublish_expert_listing'),
     

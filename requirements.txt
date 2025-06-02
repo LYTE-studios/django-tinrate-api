@@ -4,3 +4,6 @@ djangorestframework-simplejwt==5.5.0
 python-decouple==3.8
 psycopg2-binary==2.9.10
 django-cors-headers==4.7.0
+django-storages==1.14.4
+boto3==1.35.84
+requests==2.32.3
