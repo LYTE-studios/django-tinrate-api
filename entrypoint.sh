@@ -22,7 +22,7 @@ pip install --no-cache-dir -r requirements.txt
 
 # Collect static files
 echo "Collecting static files..."
-python manage.py collectstatic --noinput --clear
+python manage.py collectstatic --noinput --clear || echo "Static files collection failed, continuing..."
 
 # Run database migrations
 echo "Running database migrations..."
