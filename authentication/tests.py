@@ -7,7 +7,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from datetime import timedelta
 from django.utils import timezone
 
-from .models import RefreshToken as CustomRefreshToken, EmailVerification
+from .models import RefreshToken as CustomRefreshToken
 from users.models import EmailVerification
 
 User = get_user_model()
