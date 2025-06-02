@@ -47,13 +47,16 @@ class RegisterSerializer(serializers.ModelSerializer):
     """
     Serializer for user registration.
     """
-    firstName = serializers.CharField(source='first_name', required=True)
-    lastName = serializers.CharField(source='last_name', required=True)
+    firstName = serializers.CharField(source='first_name', required=False, allow_blank=True)
+    lastName = serializers.CharField(source='last_name', required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, validators=[validate_password])
 
     class Meta:
         model = User
         fields = ['email', 'password', 'firstName', 'lastName', 'country']
+        extra_kwargs = {
+            'country': {'required': False, 'allow_blank': True},
+        }
 
     def validate_email(self, value):
         """Validate that email is unique."""
@@ -65,6 +68,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         """Create a new user with encrypted password."""
         password = validated_data.pop('password')
         user = User.objects.create_user(password=password, **validated_data)
+        # Only mark profile complete if all required fields are provided
+        # Since first_name, last_name, and country are now optional during registration,
+        # profile completion will be handled later in the application flow
         user.mark_profile_complete()
         return user
 

@@ -47,6 +47,28 @@ class AuthenticationTestCase(APITestCase):
         self.assertEqual(user.last_name, self.user_data['lastName'])
         self.assertFalse(user.is_email_verified)
     
+    def test_user_registration_minimal_fields(self):
+        """Test successful user registration with minimal fields (email and password only)."""
+        minimal_data = {
+            'email': 'minimal@example.com',
+            'password': 'testpassword123'
+        }
+        
+        response = self.client.post(self.register_url, minimal_data)
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data['success'])
+        self.assertEqual(response.data['data']['user']['email'], minimal_data['email'])
+        self.assertTrue(response.data['data']['requiresEmailVerification'])
+        
+        # Check user was created with empty optional fields
+        user = User.objects.get(email=minimal_data['email'])
+        self.assertEqual(user.first_name, '')
+        self.assertEqual(user.last_name, '')
+        self.assertEqual(user.country, '')
+        self.assertFalse(user.is_email_verified)
+        self.assertFalse(user.profile_complete)  # Profile should not be complete without required fields
+    
     def test_user_registration_duplicate_email(self):
         """Test registration with duplicate email."""
         # Create user first
