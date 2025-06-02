@@ -7,18 +7,8 @@ services:
     command: gunicorn --workers 3 --bind 0.0.0.0:80 tinrate_api.wsgi:application
     volumes:
       - .:/app
-      - static_volume:/app/staticfiles
-      - media_volume:/app/media
     ports:
       - "80:80"
     env_file:
       - .env
-    depends_on:
-      db:
-        condition: service_healthy
     restart: unless-stopped
-
-volumes:
-  postgres_data:
-  static_volume:
-  media_volume:
