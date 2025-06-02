@@ -47,4 +47,4 @@ EXPOSE 8000
 ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Default command
-CMD ["gunicorn", "--workers", "3", "--bind", "0.0.0.0:8000", "tinrate_api.wsgi:application"]
+CMD ["gunicorn", "--workers", "3", "--bind", "0.0.0.0:80", "tinrate_api.wsgi:application"]
