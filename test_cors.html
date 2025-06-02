@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TinRate API CORS Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔗 TinRate API CORS Test</h1>
+        <p>This page tests CORS configuration for the TinRate API.</p>
+
+        <div class="test-section">
+            <h3>API Base URL</h3>
+            <input type="text" id="apiUrl" value="http://localhost:8000/v1" placeholder="Enter API base URL">
+            <button onclick="updateApiUrl()">Update URL</button>
+        </div>
+
+        <div class="test-section">
+            <h3>1. CORS Test Endpoint</h3>
+            <button onclick="testCors()">Test CORS</button>
+            <div id="corsResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Health Check</h3>
+            <button onclick="testHealth()">Test Health Endpoint</button>
+            <div id="healthResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Config Endpoint</h3>
+            <button onclick="testConfig()">Test Config Endpoint</button>
+            <div id="configResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Experts Endpoint (with CORS)</h3>
+            <button onclick="testExperts()">Test Experts Endpoint</button>
+            <div id="expertsResult"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. POST Request Test</h3>
+            <button onclick="testPost()">Test POST with CORS</button>
+            <div id="postResult"></div>
+        </div>
+    </div>
+
+    <script>
+        let apiBaseUrl = 'http://localhost:8000/v1';
+
+        function updateApiUrl() {
+            apiBaseUrl = document.getElementById('apiUrl').value;
+            console.log('Updated API URL to:', apiBaseUrl);
+        }
+
+        async function makeRequest(url, options = {}) {
+            try {
+                console.log(`Making request to: ${url}`);
+                console.log('Options:', options);
+
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
+
+                console.log('Response status:', response.status);
+                console.log('Response headers:', [...response.headers.entries()]);
+
+                const data = await response.json();
+                return { success: true, data, status: response.status };
+            } catch (error) {
+                console.error('Request failed:', error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        function displayResult(elementId, result) {
+            const element = document.getElementById(elementId);
+            const isSuccess = result.success;
+
+            element.className = isSuccess ? 'success' : 'error';
+            element.innerHTML = `
+                <h4>${isSuccess ? '✅ Success' : '❌ Error'}</h4>
+                <pre>${JSON.stringify(result, null, 2)}</pre>
+            `;
+        }
+
+        async function testCors() {
+            const result = await makeRequest(`${apiBaseUrl}/cors-test/`);
+            displayResult('corsResult', result);
+        }
+
+        async function testHealth() {
+            const result = await makeRequest(`${apiBaseUrl}/health/`);
+            displayResult('healthResult', result);
+        }
+
+        async function testConfig() {
+            const result = await makeRequest(`${apiBaseUrl}/config/`);
+            displayResult('configResult', result);
+        }
+
+        async function testExperts() {
+            const result = await makeRequest(`${apiBaseUrl}/experts/`);
+            displayResult('expertsResult', result);
+        }
+
+        async function testPost() {
+            const result = await makeRequest(`${apiBaseUrl}/cors-test/`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    test: 'CORS POST request',
+                    timestamp: new Date().toISOString()
+                })
+            });
+            displayResult('postResult', result);
+        }
+
+        // Auto-update API URL from input
+        document.getElementById('apiUrl').addEventListener('change', updateApiUrl);
+
+        console.log('CORS Test Page Loaded');
+        console.log('Current API URL:', apiBaseUrl);
+    </script>
+</body>
+
+</html>

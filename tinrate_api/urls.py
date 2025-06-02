@@ -73,4 +73,7 @@ urlpatterns = [
     
     # Dashboard endpoint (could be moved to separate app)
     path('v1/dashboard/', include('users.dashboard_urls')),
+    
+    # CORS test endpoint
+    path('v1/', include('tinrate_api.cors_test_urls')),
 ]
