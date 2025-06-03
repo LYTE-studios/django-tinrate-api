@@ -116,6 +116,16 @@ class EmailVerificationSerializer(serializers.Serializer):
         return data
 
 
+class EmailVerificationResponseSerializer(serializers.Serializer):
+    """
+    Serializer for email verification response data.
+    """
+    message = serializers.CharField(read_only=True)
+    accessToken = serializers.CharField(read_only=True)
+    refreshToken = serializers.CharField(read_only=True)
+    user = UserSerializer(read_only=True)
+
+
 class ResendVerificationSerializer(serializers.Serializer):
     """
     Serializer for resending email verification.

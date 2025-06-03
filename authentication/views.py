@@ -186,6 +186,24 @@ def verify_email(request):
         user.is_email_verified = True
         user.save()
         
+        # Generate JWT tokens for automatic authentication
+        refresh = RefreshToken.for_user(user)
+        access_token = str(refresh.access_token)
+        refresh_token = str(refresh)
+        
+        # Store custom refresh token
+        CustomRefreshToken.create_for_user(user)
+        
+        # Log successful verification/login
+        ip_address = get_client_ip(request)
+        user_agent = request.META.get('HTTP_USER_AGENT', '')
+        LoginAttempt.log_attempt(
+            email=user.email,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            success=True
+        )
+        
         # Send welcome email
         try:
             EmailService.send_welcome_email(user)
@@ -193,9 +211,14 @@ def verify_email(request):
             # Don't fail the verification if welcome email fails
             print(f"Warning: Failed to send welcome email to {user.email}: {str(e)}")
         
-        return success_response({
-            'message': 'Email verified successfully'
-        })
+        response_data = {
+            'message': 'Email verified successfully',
+            'accessToken': access_token,
+            'refreshToken': refresh_token,
+            'user': UserSerializer(user).data
+        }
+        
+        return success_response(response_data)
     
     return error_response(
         "Email verification failed",

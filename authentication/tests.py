@@ -171,6 +171,18 @@ class AuthenticationTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data['success'])
         
+        # Check that tokens are returned for automatic authentication
+        self.assertIn('accessToken', response.data['data'])
+        self.assertIn('refreshToken', response.data['data'])
+        self.assertIn('user', response.data['data'])
+        self.assertEqual(response.data['data']['user']['email'], user.email)
+        
+        # Verify tokens are valid strings
+        self.assertIsInstance(response.data['data']['accessToken'], str)
+        self.assertIsInstance(response.data['data']['refreshToken'], str)
+        self.assertTrue(len(response.data['data']['accessToken']) > 0)
+        self.assertTrue(len(response.data['data']['refreshToken']) > 0)
+        
         # Check user is verified
         user.refresh_from_db()
         self.assertTrue(user.is_email_verified)
