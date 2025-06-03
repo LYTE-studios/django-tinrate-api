@@ -1,0 +1,29 @@
+Welcome to TinRate!
+
+Hi {% if user.first_name %}{{ user.first_name }}{% else %}there{% endif %},
+
+Congratulations! Your TinRate account has been successfully verified and is now ready to use.
+
+TinRate connects you with industry experts for personalized consultations. Whether you're looking for advice, mentorship, or expert insights, you're now part of a community that values knowledge sharing.
+
+Get started: {{ base_url }}/dashboard
+
+What's next?
+- Complete your profile to get personalized expert recommendations
+- Browse our expert directory to find the perfect match for your needs
+- Book your first consultation and start learning from the best
+- Explore different expertise areas and discover new opportunities
+
+Our platform offers:
+- Expert Directory: Find professionals across various industries
+- Flexible Scheduling: Book consultations that fit your schedule
+- Secure Payments: Safe and transparent pricing
+- Quality Assurance: All experts are verified and rated
+
+If you have any questions or need assistance getting started, don't hesitate to reach out to our support team. We're here to help you make the most of your TinRate experience!
+
+Best regards,
+The TinRate Team
+
+Contact Support: {{ support_email }}
+Visit TinRate: https://tinrate.com

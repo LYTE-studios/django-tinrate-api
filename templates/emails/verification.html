@@ -1,0 +1,31 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Verify your TinRate account{% endblock %}
+
+{% block content %}
+<h1>Welcome to TinRate!</h1>
+
+<p>Hi {% if user.first_name %}{{ user.first_name }}{% else %}there{% endif %},</p>
+
+<p>Thank you for signing up for TinRate! To complete your registration and verify your email address, please use the
+    verification code below:</p>
+
+<div class="verification-code">
+    <p><strong>Your verification code is:</strong></p>
+    <div class="code">{{ verification_code }}</div>
+</div>
+
+<div class="highlight-box">
+    <p><strong>Important:</strong> This code will expire in 24 hours for security reasons.</p>
+</div>
+
+<p>If you didn't create a TinRate account, you can safely ignore this email.</p>
+
+<p>Once verified, you'll be able to:</p>
+<ul>
+    <li>Browse our expert directory</li>
+    <li>Book consultations with industry professionals</li>
+    <li>Access personalized recommendations</li>
+    <li>Join our community of learners and experts</li>
+</ul>
+{% endblock %}

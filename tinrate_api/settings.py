@@ -76,7 +76,7 @@ ROOT_URLCONF = "tinrate_api.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -313,13 +313,19 @@ if DEBUG:
     CSRF_TRUSTED_ORIGINS = ['http://*', 'https://*']
 
 # Email Configuration
-EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = config('EMAIL_HOST', default='localhost')
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=False, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='tanguy@lytestudios.be')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@tinrate.com')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='tanguy@lytestudios.be')
+SERVER_EMAIL = config('SERVER_EMAIL', default='tanguy@lytestudios.be')
+
+# Email settings for TinRate
+TINRATE_FROM_EMAIL = config('TINRATE_FROM_EMAIL', default='tanguy@lytestudios.be')
+TINRATE_SUPPORT_EMAIL = config('TINRATE_SUPPORT_EMAIL', default='tanguy@lytestudios.be')
 
 # Cache Configuration
 CACHES = {

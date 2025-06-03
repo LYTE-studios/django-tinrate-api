@@ -10,6 +10,7 @@ import secrets
 import string
 
 from tinrate_api.utils import success_response, error_response
+from tinrate_api.email_service import EmailService
 from users.models import EmailVerification
 from .models import RefreshToken as CustomRefreshToken, LoginAttempt
 from .serializers import (
@@ -38,9 +39,16 @@ def generate_verification_code():
 
 def send_verification_email(user, verification_code):
     """Send verification email to user."""
-    # In a real implementation, this would send an actual email
-    # For now, we'll just print to console
-    print(f"Verification email sent to {user.email}: {verification_code}")
+    try:
+        success = EmailService.send_verification_email(user, verification_code)
+        if success:
+            print(f"✅ Verification email sent successfully to {user.email}")
+        else:
+            print(f"❌ Failed to send verification email to {user.email}")
+        return success
+    except Exception as e:
+        print(f"❌ Error sending verification email to {user.email}: {str(e)}")
+        return False
 
 
 @api_view(['POST'])
@@ -177,6 +185,13 @@ def verify_email(request):
         # Mark user email as verified
         user.is_email_verified = True
         user.save()
+        
+        # Send welcome email
+        try:
+            EmailService.send_welcome_email(user)
+        except Exception as e:
+            # Don't fail the verification if welcome email fails
+            print(f"Warning: Failed to send welcome email to {user.email}: {str(e)}")
         
         return success_response({
             'message': 'Email verified successfully'

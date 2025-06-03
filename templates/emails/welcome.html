@@ -1,0 +1,39 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Welcome to TinRate - Your account is ready!{% endblock %}
+
+{% block content %}
+<h1>Welcome to TinRate!</h1>
+
+<p>Hi {% if user.first_name %}{{ user.first_name }}{% else %}there{% endif %},</p>
+
+<p>Congratulations! Your TinRate account has been successfully verified and is now ready to use.</p>
+
+<p>TinRate connects you with industry experts for personalized consultations. Whether you're looking for advice,
+    mentorship, or expert insights, you're now part of a community that values knowledge sharing.</p>
+
+<div style="text-align: center;">
+    <a href="{{ base_url }}/dashboard" class="button">Get Started</a>
+</div>
+
+<div class="highlight-box">
+    <p><strong>What's next?</strong></p>
+    <ul>
+        <li>Complete your profile to get personalized expert recommendations</li>
+        <li>Browse our expert directory to find the perfect match for your needs</li>
+        <li>Book your first consultation and start learning from the best</li>
+        <li>Explore different expertise areas and discover new opportunities</li>
+    </ul>
+</div>
+
+<p>Our platform offers:</p>
+<ul>
+    <li><strong>Expert Directory:</strong> Find professionals across various industries</li>
+    <li><strong>Flexible Scheduling:</strong> Book consultations that fit your schedule</li>
+    <li><strong>Secure Payments:</strong> Safe and transparent pricing</li>
+    <li><strong>Quality Assurance:</strong> All experts are verified and rated</li>
+</ul>
+
+<p>If you have any questions or need assistance getting started, don't hesitate to reach out to our support team. We're
+    here to help you make the most of your TinRate experience!</p>
+{% endblock %}

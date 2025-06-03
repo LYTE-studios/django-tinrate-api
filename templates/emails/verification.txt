@@ -1,0 +1,23 @@
+Welcome to TinRate!
+
+Hi {% if user.first_name %}{{ user.first_name }}{% else %}there{% endif %},
+
+Thank you for signing up for TinRate! To complete your registration and verify your email address, please use the verification code below:
+
+Your verification code is: {{ verification_code }}
+
+IMPORTANT: This code will expire in 24 hours for security reasons.
+
+If you didn't create a TinRate account, you can safely ignore this email.
+
+Once verified, you'll be able to:
+- Browse our expert directory
+- Book consultations with industry professionals
+- Access personalized recommendations
+- Join our community of learners and experts
+
+Best regards,
+The TinRate Team
+
+Contact Support: {{ support_email }}
+Visit TinRate: https://tinrate.com
